@@ -31,11 +31,11 @@ jobs:
       - name: Make Gradle Wrapper Executable
         run: chmod +x ./gradlew
 
-      - name: Run Unit Tests
-        run: ./gradlew :app:testDebugUnitTest --stacktrace
-
       - name: Build Debug APK
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Run Unit Tests
+        run: ./gradlew :app:testDebugUnitTest --stacktrace --no-daemon
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
@@ -45,7 +45,7 @@ jobs:
           retention-days: 14
 
       - name: Build Release APK (Optional)
-        run: ./gradlew :app:assembleRelease --stacktrace || echo "Release build step completed"
+        run: ./gradlew :app:assembleRelease --stacktrace --no-daemon || echo "Release build step completed"
         continue-on-error: true
 
       - name: Upload Release Artifacts
