@@ -1,0 +1,6 @@
+{
+  "name": "CV Maker - Resume builder",
+  "description": "Professional CV maker and resume builder with drag-and-drop section reordering, interactive templates, real-time PDF preview and export, and monetization integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
