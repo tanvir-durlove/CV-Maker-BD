@@ -129,10 +129,16 @@ fun TestInlineSponsorAd(
             ) {
                 Box(
                     modifier = Modifier
-                        .background(AdBadgeBg, RoundedCornerShape(4.dp))
-                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                        .background(Color(0xFFE5E7EB), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
-                    Text("Ad", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = AdBadgeText)
+                    Text(
+                        text = "SPONSORED",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4B5563),
+                        letterSpacing = 0.5.sp
+                    )
                 }
 
                 Box(

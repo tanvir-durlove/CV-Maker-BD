@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,9 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
+import com.example.ui.components.NativeTemplateAdCard
 import com.example.ui.components.TemplateCard
 import com.example.ui.components.TestBannerAd
-import com.example.ui.components.TestInlineSponsorAd
 import com.example.ui.theme.*
 import com.example.viewmodel.MainViewModel
 import com.example.viewmodel.ScreenType
@@ -84,8 +85,17 @@ fun HomeScreen(
                             letterSpacing = 1.2.sp
                         )
                         Spacer(modifier = Modifier.height(2.dp))
+                        val greeting = remember {
+                            val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                            when (hour) {
+                                in 5..11 -> "Good morning"
+                                in 12..16 -> "Good afternoon"
+                                else -> "Good evening"
+                            }
+                        }
+                        val greetingText = if (userName.isNotBlank()) "$greeting, $userName." else "$greeting."
                         Text(
-                            text = "Good afternoon, $userName.",
+                            text = greetingText,
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextDark
@@ -304,35 +314,30 @@ fun HomeScreen(
                         }
                     }
 
+                    // Second row: 1 Template card + 1 Native Ad card styled identically like a template
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        if (templates.size >= 4) {
+                        if (templates.size >= 3) {
                             TemplateCard(
                                 template = templates[2],
                                 isUnlocked = unlockedTemplates.contains(templates[2].id),
                                 onSelect = { viewModel.requestSelectTemplate(templates[2]) },
                                 modifier = Modifier.weight(1f)
                             )
-                            TemplateCard(
-                                template = templates[3],
-                                isUnlocked = unlockedTemplates.contains(templates[3].id),
-                                onSelect = { viewModel.requestSelectTemplate(templates[3]) },
-                                modifier = Modifier.weight(1f)
-                            )
                         }
+
+                        // Native Template Ad fitting seamlessly into the 2-column layout
+                        NativeTemplateAdCard(
+                            sponsorTitle = "Career Pro",
+                            sponsorCategory = "Interview Prep",
+                            sponsorDescription = "AI-powered mock interview practice.",
+                            accentColor = Color(0xFF6366F1),
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
-            }
-
-            // Inline sponsor ad banner
-            item {
-                TestInlineSponsorAd(
-                    title = "Prepare smarter with Learnly",
-                    actionText = "Try free"
-                )
-                Spacer(modifier = Modifier.height(10.dp))
             }
         }
     }

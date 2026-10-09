@@ -40,8 +40,15 @@ class CVMakerRobolectricAuditTest {
         assertEquals(ScreenType.HOME, viewModel.currentScreen.value)
         assertTrue(viewModel.isInterstitialAdShowing.value)
 
+        // Dismiss interstitial ad -> triggers Name Capture dialog on fresh install
         viewModel.dismissInterstitialAd()
         assertFalse(viewModel.isInterstitialAdShowing.value)
+        assertTrue(viewModel.isNameCaptureDialogShowing.value)
+
+        // Submitting name updates user name and closes dialog
+        viewModel.submitFirstName("Tanvir")
+        assertFalse(viewModel.isNameCaptureDialogShowing.value)
+        assertEquals("Tanvir", viewModel.userName.value)
 
         // Can navigate to screens
         viewModel.navigateTo(ScreenType.TEMPLATES)
@@ -133,5 +140,25 @@ class CVMakerRobolectricAuditTest {
         assertNotNull(bitmap)
         assertTrue(bitmap.width > 0)
         assertTrue(bitmap.height > 0)
+    }
+
+    @Test
+    fun testCvRenaming() {
+        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        val viewModel = MainViewModel(app)
+
+        viewModel.createNewCv("aura")
+        val createdId = viewModel.activeCv.value.id
+        viewModel.saveActiveCv()
+
+        val originalTitle = viewModel.activeCv.value.title
+        assertEquals("My Aura CV", originalTitle)
+
+        // Rename the CV
+        viewModel.renameCv(createdId, "Lead Android Architect CV")
+        val renamedCv = viewModel.savedCvs.value.find { it.id == createdId }
+        assertNotNull(renamedCv)
+        assertEquals("Lead Android Architect CV", renamedCv?.title)
+        assertEquals("Lead Android Architect CV", viewModel.activeCv.value.title)
     }
 }

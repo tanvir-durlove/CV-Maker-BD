@@ -40,41 +40,37 @@ data class CVModel(
         CVSectionType.LANGUAGES
     ),
     // Personal details
-    val fullName: String = "Td",
-    val professionalTitle: String = "Product Designer",
-    val email: String = "alex@example.com",
-    val phone: String = "+1 555 0100",
-    val location: String = "Austin, TX",
-    val website: String = "portfolio.com",
-    val professionalSummary: String = "Product designer with 5+ years crafting cohesive systems and user experiences across mobile and web. Passionate about typography, intuitive interaction, and measurable business impact.",
+    val fullName: String = "",
+    val professionalTitle: String = "",
+    val email: String = "",
+    val phone: String = "",
+    val location: String = "",
+    val website: String = "",
+    val professionalSummary: String = "",
+    val photoUri: String? = null,
+    val showQrCode: Boolean = true,
     // Experiences
     val experiences: List<ExperienceItem> = listOf(
         ExperienceItem(
-            jobTitle = "Senior Product Designer",
-            company = "Acme Studio",
-            dates = "Jan 2022 — Present",
-            achievements = "Led the redesign of onboarding, improving activation by 24%. Mentored 4 junior designers and spearheaded design system revamp."
-        ),
-        ExperienceItem(
-            jobTitle = "UI/UX Designer",
-            company = "FinTech Labs",
-            dates = "2019 — 2021",
-            achievements = "Created responsive checkout flows reducing cart drop-off by 18%. Collaborated closely with mobile engineering."
+            jobTitle = "",
+            company = "",
+            dates = "",
+            achievements = ""
         )
     ),
     // Education
     val educations: List<EducationItem> = listOf(
         EducationItem(
-            school = "State University",
-            degree = "BA, Interaction Design",
-            dates = "2017 — 2021"
+            school = "",
+            degree = "",
+            dates = ""
         )
     ),
     // Skills
-    val skills: String = "Product strategy, Figma, User research, Prototyping, Design systems, Design tokens",
+    val skills: String = "",
     // Additional sections
-    val projects: String = "Google UX Design Certificate · 2024\nDesign System Architecture Workshop · 2023",
-    val languages: String = "English — Native, Spanish — Professional",
+    val projects: String = "",
+    val languages: String = "",
     val includeSponsorFooter: Boolean = true
 )
 

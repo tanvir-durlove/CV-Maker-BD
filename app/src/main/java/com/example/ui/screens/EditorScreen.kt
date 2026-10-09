@@ -1,7 +1,11 @@
 package com.example.ui.screens
 
 import android.graphics.Color as AndroidColor
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -331,10 +335,104 @@ private fun StepPersonalDetails(viewModel: MainViewModel) {
             }
         }
 
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val photoPickerLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.PickVisualMedia()
+        ) { uri: Uri? ->
+            if (uri != null) {
+                // Copy photo to app private internal storage to preserve across launches
+                try {
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                    val photoFile = java.io.File(context.filesDir, "avatar_${cv.id}.jpg")
+                    val outputStream = java.io.FileOutputStream(photoFile)
+                    inputStream?.copyTo(outputStream)
+                    inputStream?.close()
+                    outputStream.close()
+                    viewModel.updateActiveCv { c -> c.copy(photoUri = photoFile.absolutePath) }
+                } catch (_: Exception) {}
+            }
+        }
+
+        // Profile Photo selection card
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = PureWhite,
+            border = androidx.compose.foundation.BorderStroke(1.dp, LightBorder)
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(MintBadgeBg)
+                            .border(1.dp, MintBadgeBorder, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (!cv.photoUri.isNullOrBlank() && java.io.File(cv.photoUri).exists()) {
+                            coil.compose.AsyncImage(
+                                model = cv.photoUri,
+                                contentDescription = "Profile Photo",
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            )
+                        } else {
+                            Icon(Icons.Default.Person, contentDescription = null, tint = ForestGreen, modifier = Modifier.size(24.dp))
+                        }
+                    }
+
+                    Column {
+                        Text("Profile Photo", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                        Text(
+                            text = if (!cv.photoUri.isNullOrBlank()) "Photo added · Shown on Aura" else "Optional photo for CV header",
+                            fontSize = 11.sp,
+                            color = TextMuted
+                        )
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!cv.photoUri.isNullOrBlank()) {
+                        IconButton(
+                            onClick = { viewModel.updateActiveCv { c -> c.copy(photoUri = null) } },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.DeleteOutline, contentDescription = "Remove Photo", tint = Color(0xFFC53030), modifier = Modifier.size(18.dp))
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MintBadgeBg,
+                            contentColor = ForestGreen
+                        ),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp).testTag("select_photo_btn")
+                    ) {
+                        Text(if (cv.photoUri.isNullOrBlank()) "Add" else "Change", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
         EditorFormField(
             label = "Full name",
             value = cv.fullName,
-            placeholder = "Alex Morgan",
+            placeholder = "Enter your full name",
             testTag = "input_full_name",
             onValueChange = { viewModel.updateActiveCv { c -> c.copy(fullName = it) } }
         )
@@ -342,7 +440,7 @@ private fun StepPersonalDetails(viewModel: MainViewModel) {
         EditorFormField(
             label = "Professional title",
             value = cv.professionalTitle,
-            placeholder = "Product Designer",
+            placeholder = "e.g. Software Engineer, Project Manager",
             testTag = "input_professional_title",
             onValueChange = { viewModel.updateActiveCv { c -> c.copy(professionalTitle = it) } }
         )
@@ -350,7 +448,7 @@ private fun StepPersonalDetails(viewModel: MainViewModel) {
         EditorFormField(
             label = "Email",
             value = cv.email,
-            placeholder = "alex@example.com",
+            placeholder = "your.email@example.com",
             testTag = "input_email",
             onValueChange = { viewModel.updateActiveCv { c -> c.copy(email = it) } }
         )
@@ -358,7 +456,7 @@ private fun StepPersonalDetails(viewModel: MainViewModel) {
         EditorFormField(
             label = "Phone",
             value = cv.phone,
-            placeholder = "+1 555 0100",
+            placeholder = "+1 234 567 8900",
             testTag = "input_phone",
             onValueChange = { viewModel.updateActiveCv { c -> c.copy(phone = it) } }
         )
@@ -366,7 +464,7 @@ private fun StepPersonalDetails(viewModel: MainViewModel) {
         EditorFormField(
             label = "Location",
             value = cv.location,
-            placeholder = "Austin, TX",
+            placeholder = "City, Country",
             testTag = "input_location",
             onValueChange = { viewModel.updateActiveCv { c -> c.copy(location = it) } }
         )
@@ -374,7 +472,7 @@ private fun StepPersonalDetails(viewModel: MainViewModel) {
         EditorFormField(
             label = "Website or portfolio",
             value = cv.website,
-            placeholder = "portfolio.com",
+            placeholder = "linkedin.com/in/yourname",
             testTag = "input_website",
             onValueChange = { viewModel.updateActiveCv { c -> c.copy(website = it) } }
         )
@@ -457,7 +555,7 @@ private fun StepExperience(viewModel: MainViewModel) {
                     EditorFormField(
                         label = "Job title",
                         value = exp.jobTitle,
-                        placeholder = "Senior Product Designer",
+                        placeholder = "e.g. Senior Software Engineer",
                         testTag = "input_job_title_$index",
                         onValueChange = { viewModel.updateExperience(index, exp.copy(jobTitle = it)) }
                     )
@@ -465,7 +563,7 @@ private fun StepExperience(viewModel: MainViewModel) {
                     EditorFormField(
                         label = "Company",
                         value = exp.company,
-                        placeholder = "Acme Studio",
+                        placeholder = "e.g. Google, Microsoft, Local Tech Ltd.",
                         testTag = "input_company_$index",
                         onValueChange = { viewModel.updateExperience(index, exp.copy(company = it)) }
                     )
@@ -473,7 +571,7 @@ private fun StepExperience(viewModel: MainViewModel) {
                     EditorFormField(
                         label = "Dates",
                         value = exp.dates,
-                        placeholder = "Jan 2022 — Present",
+                        placeholder = "e.g. Jan 2022 — Present",
                         testTag = "input_dates_$index",
                         onValueChange = { viewModel.updateExperience(index, exp.copy(dates = it)) }
                     )
@@ -481,7 +579,7 @@ private fun StepExperience(viewModel: MainViewModel) {
                     EditorFormField(
                         label = "Achievements",
                         value = exp.achievements,
-                        placeholder = "Led the redesign of onboarding, improving activation by 24%.",
+                        placeholder = "Describe your key contributions, projects delivered, and measurable results.",
                         singleLine = false,
                         minLines = 3,
                         testTag = "input_achievements_$index",
@@ -605,7 +703,7 @@ private fun StepEducation(viewModel: MainViewModel) {
                     EditorFormField(
                         label = "School or institution",
                         value = edu.school,
-                        placeholder = "State University",
+                        placeholder = "e.g. Dhaka University, MIT, Oxford",
                         testTag = "input_school_$index",
                         onValueChange = { viewModel.updateEducation(index, edu.copy(school = it)) }
                     )
@@ -613,7 +711,7 @@ private fun StepEducation(viewModel: MainViewModel) {
                     EditorFormField(
                         label = "Degree or qualification",
                         value = edu.degree,
-                        placeholder = "BA, Interaction Design",
+                        placeholder = "e.g. BSc in Computer Science, MBA",
                         testTag = "input_degree_$index",
                         onValueChange = { viewModel.updateEducation(index, edu.copy(degree = it)) }
                     )
@@ -621,7 +719,7 @@ private fun StepEducation(viewModel: MainViewModel) {
                     EditorFormField(
                         label = "Dates",
                         value = edu.dates,
-                        placeholder = "2017 — 2021",
+                        placeholder = "e.g. 2018 — 2022",
                         testTag = "input_edu_dates_$index",
                         onValueChange = { viewModel.updateEducation(index, edu.copy(dates = it)) }
                     )
@@ -684,7 +782,7 @@ private fun StepSkills(viewModel: MainViewModel) {
         EditorFormField(
             label = "Skills",
             value = cv.skills,
-            placeholder = "Product strategy, Figma, User research, Prototyping",
+            placeholder = "e.g. Kotlin, Project Management, Team Leadership, Problem Solving",
             singleLine = false,
             minLines = 4,
             testTag = "input_skills",
@@ -779,7 +877,7 @@ private fun StepFinishingAndReorder(viewModel: MainViewModel) {
         EditorFormField(
             label = "Projects, courses & certifications",
             value = cv.projects,
-            placeholder = "Google UX Design Certificate · 2024",
+            placeholder = "e.g. AWS Certified Solutions Architect (2024), E-commerce Platform Redesign",
             singleLine = false,
             minLines = 3,
             testTag = "input_projects",
@@ -789,7 +887,7 @@ private fun StepFinishingAndReorder(viewModel: MainViewModel) {
         EditorFormField(
             label = "Languages",
             value = cv.languages,
-            placeholder = "English — Native, Spanish — Professional",
+            placeholder = "e.g. English (Fluent), Bengali (Native), Spanish (Basic)",
             testTag = "input_languages",
             onValueChange = { viewModel.updateActiveCv { c -> c.copy(languages = it) } }
         )
@@ -830,6 +928,51 @@ private fun StepFinishingAndReorder(viewModel: MainViewModel) {
                         }
                     }
                 }
+            }
+        }
+
+        Divider(color = LightBorder, thickness = 0.8.dp)
+
+        // Portfolio QR Code toggle
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            color = PureWhite,
+            border = androidx.compose.foundation.BorderStroke(1.dp, LightBorder)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(MintBadgeBg),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.QrCode2, contentDescription = null, tint = ForestGreen, modifier = Modifier.size(20.dp))
+                    }
+                    Column {
+                        Text("Portfolio QR Code", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextDark)
+                        Text("Auto-generate a scannable QR code on your CV from your website/portfolio URL.", fontSize = 11.sp, color = TextMuted)
+                    }
+                }
+
+                Switch(
+                    checked = cv.showQrCode,
+                    onCheckedChange = { viewModel.updateActiveCv { c -> c.copy(showQrCode = it) } },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = PureWhite,
+                        checkedTrackColor = ForestGreen
+                    )
+                )
             }
         }
 

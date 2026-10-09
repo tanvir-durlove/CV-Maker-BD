@@ -22,9 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.TemplateInfo
+import com.example.ui.components.NativeTemplateAdCard
 import com.example.ui.components.TemplateCard
-import com.example.ui.components.TestBannerAd
-import com.example.ui.components.TestInlineSponsorAd
 import com.example.ui.theme.*
 import com.example.viewmodel.MainViewModel
 
@@ -49,15 +48,7 @@ fun TemplatesScreen(
 
     Scaffold(
         modifier = modifier.fillMaxSize().background(MintBackground),
-        containerColor = MintBackground,
-        bottomBar = {
-            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                TestBannerAd(
-                    sponsorName = "Land your next interview",
-                    actionLabel = "Learn more"
-                )
-            }
-        }
+        containerColor = MintBackground
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
@@ -141,7 +132,7 @@ fun TemplatesScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     val chunkedTemplates = filteredTemplates.chunked(2)
-                    for (rowItems in chunkedTemplates) {
+                    chunkedTemplates.forEachIndexed { rowIndex, rowItems ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(14.dp)
@@ -205,16 +196,96 @@ fun TemplatesScreen(
                                 Spacer(modifier = Modifier.weight(1f))
                             }
                         }
+
+                        // Native Ad formatted as a Template Card side-by-side in the catalog grid
+                        if (rowIndex == 1 && filteredTemplates.size >= 4) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(14.dp)
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    NativeTemplateAdCard(
+                                        sponsorTitle = "Career Pro",
+                                        sponsorCategory = "AI Mock Interview",
+                                        sponsorDescription = "Practice role-specific interview questions with instant feedback.",
+                                        accentColor = Color(0xFF6366F1),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = "Practice role-specific interview questions with instant AI feedback.",
+                                        fontSize = 12.sp,
+                                        color = TextMuted,
+                                        lineHeight = 16.sp,
+                                        minLines = 2
+                                    )
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = ForestGreen,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Text("Free tier", fontSize = 11.sp, color = ForestGreen, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    NativeTemplateAdCard(
+                                        sponsorTitle = "Learnly Pro",
+                                        sponsorCategory = "Skill Certifications",
+                                        sponsorDescription = "Fast-track in-demand cloud & management skills.",
+                                        accentColor = Color(0xFF0D9488),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = "Fast-track in-demand cloud, tech & product management skills.",
+                                        fontSize = 12.sp,
+                                        color = TextMuted,
+                                        lineHeight = 16.sp,
+                                        minLines = 2
+                                    )
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = ForestGreen,
+                                                modifier = Modifier.size(13.dp)
+                                            )
+                                            Text("Accredited", fontSize = 11.sp, color = ForestGreen, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-            }
-
-            item {
-                TestInlineSponsorAd(
-                    title = "Prepare smarter with Learnly",
-                    actionText = "Try free"
-                )
-                Spacer(modifier = Modifier.height(10.dp))
             }
         }
     }

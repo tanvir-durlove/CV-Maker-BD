@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import com.example.ui.components.AppBottomNavigation
+import com.example.ui.components.NameCaptureDialog
 import com.example.ui.components.TestInterstitialAdDialog
 import com.example.ui.components.TestRewardedAdDialog
 import com.example.ui.screens.*
@@ -47,6 +48,7 @@ fun MainContent(viewModel: MainViewModel) {
 
     val isInterstitialAdShowing by viewModel.isInterstitialAdShowing.collectAsState()
     val interstitialCountdown by viewModel.interstitialAdCountdown.collectAsState()
+    val isNameCaptureShowing by viewModel.isNameCaptureDialogShowing.collectAsState()
 
     // Find template name for rewarded ad dialog
     val pendingTemplate = viewModel.availableTemplates.find { it.id == pendingTemplateId }
@@ -96,6 +98,13 @@ fun MainContent(viewModel: MainViewModel) {
                 TestInterstitialAdDialog(
                     countdown = interstitialCountdown,
                     onAdDismissed = { viewModel.dismissInterstitialAd() }
+                )
+            } else if (isNameCaptureShowing) {
+                // First-launch personalized onboarding: captures user's name
+                NameCaptureDialog(
+                    onNameSubmitted = { submittedName ->
+                        viewModel.submitFirstName(submittedName)
+                    }
                 )
             }
 

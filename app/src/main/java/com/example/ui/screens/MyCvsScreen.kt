@@ -13,12 +13,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +38,66 @@ fun MyCvsScreen(
     modifier: Modifier = Modifier
 ) {
     val savedCvs by viewModel.savedCvs.collectAsState()
+    var renamingCv by remember { mutableStateOf<CVModel?>(null) }
+    var renameInputText by remember { mutableStateOf("") }
+
+    if (renamingCv != null) {
+        AlertDialog(
+            onDismissRequest = { renamingCv = null },
+            title = {
+                Text("Rename CV", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = TextDark)
+            },
+            text = {
+                Column {
+                    Text(
+                        "Give this CV a recognizable name (e.g. 'Software Engineer Role' or 'Academic Resume').",
+                        fontSize = 13.sp,
+                        color = TextMuted
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    OutlinedTextField(
+                        value = renameInputText,
+                        onValueChange = { renameInputText = it },
+                        singleLine = true,
+                        placeholder = { Text("Enter CV name", color = TextSubtle) },
+                        modifier = Modifier.fillMaxWidth().testTag("rename_cv_input"),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ForestGreen,
+                            unfocusedBorderColor = LightBorder,
+                            cursorColor = ForestGreen
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        renamingCv?.let { cv ->
+                            if (renameInputText.isNotBlank()) {
+                                viewModel.renameCv(cv.id, renameInputText.trim())
+                            }
+                        }
+                        renamingCv = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ForestGreen),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.testTag("confirm_rename_button")
+                ) {
+                    Text("Save", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { renamingCv = null }
+                ) {
+                    Text("Cancel", color = TextMuted)
+                }
+            },
+            containerColor = PureWhite,
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
 
     Scaffold(
         modifier = modifier.fillMaxSize().background(MintBackground),
@@ -143,6 +202,10 @@ fun MyCvsScreen(
                     CvDocumentCard(
                         cv = cv,
                         onEdit = { viewModel.editCv(cv) },
+                        onRename = {
+                            renameInputText = cv.title
+                            renamingCv = cv
+                        },
                         onExport = {
                             viewModel.editCv(cv)
                             viewModel.navigateTo(ScreenType.EXPORT_PREVIEW)
@@ -160,6 +223,7 @@ fun MyCvsScreen(
 private fun CvDocumentCard(
     cv: CVModel,
     onEdit: () -> Unit,
+    onRename: () -> Unit,
     onExport: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit
@@ -225,12 +289,29 @@ private fun CvDocumentCard(
                         letterSpacing = 1.sp
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = cv.title,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextDark
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = cv.title,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextDark,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        IconButton(
+                            onClick = onRename,
+                            modifier = Modifier.size(24.dp).testTag("rename_icon_${cv.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DriveFileRenameOutline,
+                                contentDescription = "Rename",
+                                tint = ForestGreen,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = cv.lastEdited,
@@ -242,7 +323,7 @@ private fun CvDocumentCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Action buttons row: [Edit] [Export] [Duplicate] [Delete]
+            // Action buttons row: [Edit] [Export] [Rename] [Duplicate] [Delete]
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -284,6 +365,27 @@ private fun CvDocumentCard(
                     Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(15.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Export", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // Rename Button
+                Surface(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .clickable { onRename() }
+                        .testTag("rename_cv_${cv.id}"),
+                    color = MintSurface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, LightBorder),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.DriveFileRenameOutline,
+                            contentDescription = "Rename",
+                            tint = ForestGreen,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
 
                 // Duplicate Button

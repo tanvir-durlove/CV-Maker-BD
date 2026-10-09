@@ -7,15 +7,26 @@ import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.print.PrintAttributes
 import android.print.PrintManager
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextPaint
 import androidx.core.content.FileProvider
 import com.example.model.CVModel
 import com.example.model.CVSectionType
 import java.io.File
 import java.io.FileOutputStream
 
+/**
+ * High-quality, ATS-friendly A4 PDF Engine for CV Maker.
+ * Standard A4: 595 x 842 pt (72 pt / inch).
+ * Follows executive resume typography standards:
+ * - Proper line-height, leading, and font proportions.
+ * - Dynamic pagination / safety boundary preventing content cut-off.
+ * - Clean section headers, dates alignment, bulleted achievements.
+ * - Professional accent color palettes.
+ */
 object PdfGenerator {
 
-    // Standard A4 dimensions in PostScript points: 595 x 842 points (72 points/inch)
     const val PAGE_WIDTH = 595
     const val PAGE_HEIGHT = 842
 
@@ -64,600 +75,1324 @@ object PdfGenerator {
     private fun drawCvDocument(canvas: Canvas, cv: CVModel) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        // Background
+        // Clean white page canvas
         paint.color = Color.WHITE
         canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), PAGE_HEIGHT.toFloat(), paint)
 
         val accentColor = try {
             Color.parseColor(cv.accentColorHex)
         } catch (_: Exception) {
-            Color.parseColor("#134E3F")
+            Color.parseColor("#1B365D")
         }
 
         when (cv.templateId) {
-            "clarity" -> drawClarityTemplate(canvas, cv, accentColor, paint)
-            "tradition" -> drawTraditionTemplate(canvas, cv, accentColor, paint)
-            "continental" -> drawContinentalTemplate(canvas, cv, accentColor, paint)
-            else -> drawAuraTemplate(canvas, cv, accentColor, paint)
+            "clarity" -> drawClarityTemplate(canvas, cv, accentColor)
+            "tradition" -> drawTraditionTemplate(canvas, cv, accentColor)
+            "continental" -> drawContinentalTemplate(canvas, cv, accentColor)
+            "apex" -> drawApexTemplate(canvas, cv, accentColor)
+            "summit" -> drawSummitTemplate(canvas, cv, accentColor)
+            else -> drawAuraTemplate(canvas, cv, accentColor)
         }
 
         // Sponsor footer if enabled
         if (cv.includeSponsorFooter) {
-            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-            paint.textSize = 7f
-            paint.color = Color.parseColor("#9E9E9E")
-            paint.textAlign = Paint.Align.CENTER
-
-            // Small badge pill
-            val footerText = "Created with Vitae · Career tools"
-            val textWidth = paint.measureText(footerText)
-            val badgeWidth = textWidth + 18f
-            val badgeHeight = 14f
-            val badgeX = (PAGE_WIDTH - badgeWidth) / 2f
-            val badgeY = PAGE_HEIGHT - 32f
-
-            val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            badgePaint.color = Color.parseColor("#F4F6F5")
-            canvas.drawRoundRect(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight, 4f, 4f, badgePaint)
-
-            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-            borderPaint.style = Paint.Style.STROKE
-            borderPaint.strokeWidth = 0.5f
-            borderPaint.color = Color.parseColor("#E0E4E2")
-            canvas.drawRoundRect(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight, 4f, 4f, borderPaint)
-
-            paint.color = Color.parseColor("#5A625E")
-            canvas.drawText(footerText, PAGE_WIDTH / 2f, badgeY + 10f, paint)
+            drawFooterWatermark(canvas)
         }
     }
 
-    // Template 1: Aura (Modern 2-column sidebar & content, top banner line)
-    private fun drawAuraTemplate(canvas: Canvas, cv: CVModel, accent: Int, paint: Paint) {
-        // Top accent line
-        paint.color = accent
-        paint.style = Paint.Style.FILL
-        canvas.drawRect(36f, 36f, 40f, 100f, paint)
-
-        // Avatar circle / monogram
-        paint.color = Color.parseColor("#F0F4F2")
-        canvas.drawCircle(72f, 68f, 24f, paint)
-        paint.color = accent
-        paint.textSize = 16f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.textAlign = Paint.Align.CENTER
-        val initials = cv.fullName.trim().take(2).uppercase().ifEmpty { "CV" }
-        canvas.drawText(initials, 72f, 74f, paint)
-
-        // Full Name & Title
-        paint.textAlign = Paint.Align.LEFT
-        paint.textSize = 22f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.color = Color.parseColor("#151917")
-        canvas.drawText(cv.fullName.ifEmpty { "Alex Morgan" }, 112f, 62f, paint)
-
-        paint.textSize = 11f
+    private fun drawFooterWatermark(canvas: Canvas) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        paint.color = accent
-        canvas.drawText(cv.professionalTitle.ifEmpty { "Product Designer" }, 112f, 78f, paint)
+        paint.textSize = 7.5f
+        paint.color = Color.parseColor("#8E959E")
+        paint.textAlign = Paint.Align.CENTER
 
-        // Dividing rule
-        paint.color = Color.parseColor("#E5E9E6")
-        canvas.drawLine(36f, 106f, (PAGE_WIDTH - 36).toFloat(), 106f, paint)
+        val footerText = "Built with CV Maker · NextGen Tools"
+        val textWidth = paint.measureText(footerText)
+        val badgeWidth = textWidth + 20f
+        val badgeHeight = 16f
+        val badgeX = (PAGE_WIDTH - badgeWidth) / 2f
+        val badgeY = PAGE_HEIGHT - 28f
 
-        // Left sidebar bounds: X=36 to X=180. Right content: X=200 to X=559
-        var sidebarY = 130f
-        var contentY = 130f
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#F8F9FA")
+            style = Paint.Style.FILL
+        }
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E2E8F0")
+            style = Paint.Style.STROKE
+            strokeWidth = 0.5f
+        }
+        canvas.drawRoundRect(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight, 5f, 5f, bgPaint)
+        canvas.drawRoundRect(badgeX, badgeY, badgeX + badgeWidth, badgeY + badgeHeight, 5f, 5f, borderPaint)
 
-        for (section in cv.sectionOrder) {
-            when (section) {
-                CVSectionType.PERSONAL -> {
-                    // Contact details in left sidebar
-                    sidebarY = drawSidebarSection(canvas, "CONTACT", sidebarY, accent, paint) {
-                        var y = sidebarY
-                        y = drawContactLine(canvas, cv.email, y, paint)
-                        y = drawContactLine(canvas, cv.phone, y, paint)
-                        y = drawContactLine(canvas, cv.location, y, paint)
-                        y = drawContactLine(canvas, cv.website, y, paint)
-                        y
-                    }
-                    if (cv.professionalSummary.isNotBlank()) {
-                        contentY = drawContentSection(canvas, "PROFILE", contentY, accent, paint) {
-                            drawWrappedText(canvas, cv.professionalSummary, 200f, contentY, 350f, 13f, paint)
-                        }
+        canvas.drawText(footerText, PAGE_WIDTH / 2f, badgeY + 11f, paint)
+    }
+
+    // =========================================================================
+    // TEMPLATE 1: AURA (Executive Two-Column Layout)
+    // Left: Personal contact, skills, and languages
+    // Right: Header, summary, experience, education, projects
+    // =========================================================================
+    private fun drawAuraTemplate(canvas: Canvas, cv: CVModel, accent: Int) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG)
+
+        // Left sidebar column background (soft tinted container)
+        val sidebarWidth = 175f
+        val sidebarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#F8FAFC")
+        }
+        canvas.drawRect(0f, 0f, sidebarWidth, PAGE_HEIGHT.toFloat(), sidebarPaint)
+
+        // Dividing hairline between sidebar and content
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E2E8F0")
+            strokeWidth = 0.75f
+        }
+        canvas.drawLine(sidebarWidth, 0f, sidebarWidth, PAGE_HEIGHT.toFloat(), linePaint)
+
+        // Top accent bar across the entire page
+        val accentBarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+        }
+        canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), 6f, accentBarPaint)
+
+        // ------------------ SIDEBAR CONTENT ------------------
+        var sideY = 40f
+        val sideX = 24f
+        val sideContentWidth = sidebarWidth - 48f
+
+        // Avatar Photo / Monogram Avatar
+        val avatarRadius = 26f
+        val avatarCenterY = sideY + avatarRadius
+        val avatarCenterX = sideX + (sideContentWidth / 2f)
+
+        var photoDrawn = false
+        if (!cv.photoUri.isNullOrBlank()) {
+            try {
+                val photoFile = File(cv.photoUri)
+                if (photoFile.exists()) {
+                    val rawBitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
+                    if (rawBitmap != null) {
+                        val avatarBitmap = Bitmap.createScaledBitmap(rawBitmap, (avatarRadius * 2).toInt(), (avatarRadius * 2).toInt(), true)
+                        val shader = BitmapShader(avatarBitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+                        val shaderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.shader = shader }
+                        canvas.save()
+                        canvas.translate(avatarCenterX - avatarRadius, avatarCenterY - avatarRadius)
+                        canvas.drawCircle(avatarRadius, avatarRadius, avatarRadius, shaderPaint)
+                        canvas.restore()
+                        photoDrawn = true
                     }
                 }
+            } catch (_: Exception) {}
+        }
+
+        if (!photoDrawn) {
+            val avatarBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = accent
+            }
+            canvas.drawCircle(avatarCenterX, avatarCenterY, avatarRadius, avatarBg)
+
+            val initials = cv.fullName.trim()
+                .split("\\s+".toRegex())
+                .filter { it.isNotEmpty() }
+                .take(2)
+                .map { it.first().uppercaseChar() }
+                .joinToString("")
+                .ifEmpty { "CV" }
+
+            val avatarTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.WHITE
+                textSize = 18f
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
+            canvas.drawText(initials, avatarCenterX, avatarCenterY + 6.5f, avatarTextPaint)
+        }
+        sideY += (avatarRadius * 2) + 24f
+
+        // Contact Section in Sidebar
+        sideY = drawSidebarSectionHeader(canvas, "CONTACT", sideX, sideY, sideContentWidth, accent)
+        if (cv.email.isNotBlank()) sideY = drawSidebarContactItem(canvas, cv.email, sideX, sideY, sideContentWidth)
+        if (cv.phone.isNotBlank()) sideY = drawSidebarContactItem(canvas, cv.phone, sideX, sideY, sideContentWidth)
+        if (cv.location.isNotBlank()) sideY = drawSidebarContactItem(canvas, cv.location, sideX, sideY, sideContentWidth)
+        if (cv.website.isNotBlank()) sideY = drawSidebarContactItem(canvas, cv.website, sideX, sideY, sideContentWidth)
+        sideY += 16f
+
+        // QR Code in Sidebar if enabled and website/portfolio present
+        if (cv.showQrCode && cv.website.isNotBlank()) {
+            val qrBitmap = QrCodeGenerator.generateQrBitmap(cv.website, 56)
+            if (qrBitmap != null) {
+                sideY = drawSidebarSectionHeader(canvas, "PORTFOLIO QR", sideX, sideY, sideContentWidth, accent)
+                canvas.drawBitmap(qrBitmap, sideX + (sideContentWidth - 56f) / 2f, sideY, null)
+                sideY += 66f
+            }
+        }
+
+        // Sidebar ordered sections (Skills, Languages)
+        for (sec in cv.sectionOrder) {
+            when (sec) {
                 CVSectionType.SKILLS -> {
-                    sidebarY = drawSidebarSection(canvas, "SKILLS", sidebarY, accent, paint) {
-                        drawWrappedText(canvas, cv.skills.ifEmpty { "Figma, Design Systems" }, 36f, sidebarY, 144f, 12f, paint)
+                    if (cv.skills.isNotBlank()) {
+                        sideY = drawSidebarSectionHeader(canvas, "SKILLS", sideX, sideY, sideContentWidth, accent)
+                        val skillTokens = cv.skills.split("[,•\n]+".toRegex()).map { it.trim() }.filter { it.isNotEmpty() }
+                        for (token in skillTokens) {
+                            sideY = drawSidebarBulletItem(canvas, token, sideX, sideY, sideContentWidth)
+                        }
+                        sideY += 16f
                     }
                 }
                 CVSectionType.LANGUAGES -> {
                     if (cv.languages.isNotBlank()) {
-                        sidebarY = drawSidebarSection(canvas, "LANGUAGES", sidebarY, accent, paint) {
-                            drawWrappedText(canvas, cv.languages, 36f, sidebarY, 144f, 12f, paint)
+                        sideY = drawSidebarSectionHeader(canvas, "LANGUAGES", sideX, sideY, sideContentWidth, accent)
+                        val langTokens = cv.languages.split("[,•\n]+".toRegex()).map { it.trim() }.filter { it.isNotEmpty() }
+                        for (token in langTokens) {
+                            sideY = drawSidebarBulletItem(canvas, token, sideX, sideY, sideContentWidth)
                         }
+                        sideY += 16f
                     }
                 }
-                CVSectionType.EXPERIENCE -> {
-                    contentY = drawContentSection(canvas, "EXPERIENCE", contentY, accent, paint) {
-                        var y = contentY
-                        for (exp in cv.experiences) {
-                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                            paint.textSize = 10f
-                            paint.color = Color.parseColor("#1A1F1D")
-                            canvas.drawText(exp.jobTitle, 200f, y, paint)
-                            y += 12f
-
-                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                            paint.textSize = 8.5f
-                            paint.color = Color.parseColor("#6B7570")
-                            canvas.drawText("${exp.company}  ·  ${exp.dates}", 200f, y, paint)
-                            y += 13f
-
-                            paint.color = Color.parseColor("#37413D")
-                            y = drawWrappedText(canvas, exp.achievements, 200f, y, 350f, 11f, paint) + 8f
-                        }
-                        y
-                    }
-                }
-                CVSectionType.EDUCATION -> {
-                    contentY = drawContentSection(canvas, "EDUCATION", contentY, accent, paint) {
-                        var y = contentY
-                        for (edu in cv.educations) {
-                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                            paint.textSize = 10f
-                            paint.color = Color.parseColor("#1A1F1D")
-                            canvas.drawText(edu.degree, 200f, y, paint)
-                            y += 12f
-
-                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                            paint.textSize = 8.5f
-                            paint.color = Color.parseColor("#6B7570")
-                            canvas.drawText("${edu.school}  ·  ${edu.dates}", 200f, y, paint)
-                            y += 15f
-                        }
-                        y
-                    }
-                }
-                CVSectionType.CUSTOM_PROJECTS -> {
-                    if (cv.projects.isNotBlank()) {
-                        contentY = drawContentSection(canvas, "PROJECTS & CERTIFICATIONS", contentY, accent, paint) {
-                            drawWrappedText(canvas, cv.projects, 200f, contentY, 350f, 12f, paint)
-                        }
-                    }
-                }
+                else -> Unit
             }
         }
-    }
 
-    // Template 2: Clarity (ATS Resume - Clean linear single-column format, top contact line)
-    private fun drawClarityTemplate(canvas: Canvas, cv: CVModel, accent: Int, paint: Paint) {
-        var y = 50f
-        paint.textAlign = Paint.Align.CENTER
+        // ------------------ MAIN CONTENT COLUMN ------------------
+        val mainX = sidebarWidth + 30f
+        val mainWidth = PAGE_WIDTH - mainX - 32f
+        var mainY = 42f
+
+        // Header: Name & Title
+        paint.color = Color.parseColor("#0F172A")
         paint.textSize = 24f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.color = Color.parseColor("#111827")
-        canvas.drawText(cv.fullName.ifEmpty { "Alex Morgan" }, PAGE_WIDTH / 2f, y, paint)
-        y += 16f
-
-        paint.textSize = 11f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        paint.color = accent
-        canvas.drawText(cv.professionalTitle.ifEmpty { "Product Designer" }, PAGE_WIDTH / 2f, y, paint)
-        y += 14f
-
-        paint.textSize = 8.5f
-        paint.color = Color.parseColor("#4B5563")
-        val contactStr = listOf(cv.email, cv.phone, cv.location, cv.website).filter { it.isNotBlank() }.joinToString("  |  ")
-        canvas.drawText(contactStr, PAGE_WIDTH / 2f, y, paint)
-        y += 14f
-
-        paint.color = Color.parseColor("#D1D5DB")
-        canvas.drawLine(40f, y, PAGE_WIDTH - 40f, y, paint)
-        y += 20f
-
         paint.textAlign = Paint.Align.LEFT
-        for (section in cv.sectionOrder) {
-            when (section) {
+        val displayName = cv.fullName.ifBlank { "" }
+        if (displayName.isNotBlank()) {
+            canvas.drawText(displayName, mainX, mainY, paint)
+            mainY += 18f
+        }
+
+        val displayTitle = cv.professionalTitle
+        if (displayTitle.isNotBlank()) {
+            paint.color = accent
+            paint.textSize = 12f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            canvas.drawText(displayTitle.uppercase(), mainX, mainY, paint)
+            mainY += 16f
+        }
+
+        // Content Sections according to sectionOrder
+        for (sec in cv.sectionOrder) {
+            if (mainY >= PAGE_HEIGHT - 60f) break // Protect page bottom bounds
+
+            when (sec) {
                 CVSectionType.PERSONAL -> {
                     if (cv.professionalSummary.isNotBlank()) {
-                        y = drawLinearHeader(canvas, "SUMMARY", y, accent, paint)
-                        y = drawWrappedText(canvas, cv.professionalSummary, 40f, y, 515f, 13f, paint) + 14f
+                        mainY = drawMainSectionHeader(canvas, "PROFESSIONAL PROFILE", mainX, mainY, mainWidth, accent)
+                        mainY = drawParagraph(canvas, cv.professionalSummary, mainX, mainY, mainWidth, 10f, Color.parseColor("#334155"), 14f)
+                        mainY += 14f
                     }
                 }
                 CVSectionType.EXPERIENCE -> {
-                    y = drawLinearHeader(canvas, "EXPERIENCE", y, accent, paint)
-                    for (exp in cv.experiences) {
-                        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                        paint.textSize = 10f
-                        paint.color = Color.parseColor("#111827")
-                        canvas.drawText(exp.jobTitle, 40f, y, paint)
+                    if (cv.experiences.isNotEmpty()) {
+                        mainY = drawMainSectionHeader(canvas, "WORK EXPERIENCE", mainX, mainY, mainWidth, accent)
+                        for (exp in cv.experiences) {
+                            if (mainY >= PAGE_HEIGHT - 50f) break
 
-                        paint.textAlign = Paint.Align.RIGHT
-                        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                        paint.textSize = 8.5f
-                        paint.color = Color.parseColor("#6B7280")
-                        canvas.drawText(exp.dates, PAGE_WIDTH - 40f, y, paint)
-                        y += 12f
+                            // Job Title and Dates on single line
+                            paint.color = Color.parseColor("#0F172A")
+                            paint.textSize = 11.5f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(exp.jobTitle, mainX, mainY, paint)
 
-                        paint.textAlign = Paint.Align.LEFT
-                        paint.color = accent
-                        canvas.drawText(exp.company, 40f, y, paint)
-                        y += 12f
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#64748B")
+                                textSize = 9.5f
+                                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(exp.dates, mainX + mainWidth, mainY, datePaint)
+                            mainY += 14f
 
-                        paint.color = Color.parseColor("#374151")
-                        y = drawWrappedText(canvas, exp.achievements, 40f, y, 515f, 11f, paint) + 10f
-                    }
-                }
-                CVSectionType.EDUCATION -> {
-                    y = drawLinearHeader(canvas, "EDUCATION", y, accent, paint)
-                    for (edu in cv.educations) {
-                        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                        paint.textSize = 10f
-                        paint.color = Color.parseColor("#111827")
-                        canvas.drawText(edu.degree, 40f, y, paint)
+                            // Company Name
+                            paint.color = accent
+                            paint.textSize = 10f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(exp.company, mainX, mainY, paint)
+                            mainY += 12f
 
-                        paint.textAlign = Paint.Align.RIGHT
-                        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                        paint.textSize = 8.5f
-                        paint.color = Color.parseColor("#6B7280")
-                        canvas.drawText(edu.dates, PAGE_WIDTH - 40f, y, paint)
-                        y += 12f
-
-                        paint.textAlign = Paint.Align.LEFT
-                        paint.color = Color.parseColor("#4B5563")
-                        canvas.drawText(edu.school, 40f, y, paint)
-                        y += 14f
-                    }
-                }
-                CVSectionType.SKILLS -> {
-                    y = drawLinearHeader(canvas, "SKILLS", y, accent, paint)
-                    y = drawWrappedText(canvas, cv.skills, 40f, y, 515f, 12f, paint) + 14f
-                }
-                CVSectionType.CUSTOM_PROJECTS -> {
-                    if (cv.projects.isNotBlank()) {
-                        y = drawLinearHeader(canvas, "PROJECTS & CERTIFICATIONS", y, accent, paint)
-                        y = drawWrappedText(canvas, cv.projects, 40f, y, 515f, 12f, paint) + 14f
-                    }
-                }
-                CVSectionType.LANGUAGES -> {
-                    if (cv.languages.isNotBlank()) {
-                        y = drawLinearHeader(canvas, "LANGUAGES", y, accent, paint)
-                        y = drawWrappedText(canvas, cv.languages, 40f, y, 515f, 12f, paint) + 14f
-                    }
-                }
-            }
-        }
-    }
-
-    // Template 3: Tradition (Classic formal header, serif styled aesthetics, elegant borders)
-    private fun drawTraditionTemplate(canvas: Canvas, cv: CVModel, accent: Int, paint: Paint) {
-        var y = 46f
-        // Classic top border
-        paint.color = accent
-        paint.strokeWidth = 2f
-        paint.style = Paint.Style.STROKE
-        canvas.drawRect(30f, 30f, PAGE_WIDTH - 30f, PAGE_HEIGHT - 30f, paint)
-        paint.style = Paint.Style.FILL
-
-        paint.textAlign = Paint.Align.CENTER
-        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
-        paint.textSize = 22f
-        paint.color = Color.parseColor("#1C1917")
-        canvas.drawText(cv.fullName.uppercase(), PAGE_WIDTH / 2f, y + 20f, paint)
-        y += 36f
-
-        paint.textSize = 10f
-        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
-        paint.color = accent
-        canvas.drawText(cv.professionalTitle, PAGE_WIDTH / 2f, y, paint)
-        y += 14f
-
-        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
-        paint.textSize = 8.5f
-        paint.color = Color.parseColor("#44403C")
-        val contact = listOf(cv.email, cv.phone, cv.location, cv.website).filter { it.isNotBlank() }.joinToString(" • ")
-        canvas.drawText(contact, PAGE_WIDTH / 2f, y, paint)
-        y += 14f
-
-        paint.color = accent
-        canvas.drawLine(50f, y, PAGE_WIDTH - 50f, y, paint)
-        y += 18f
-
-        paint.textAlign = Paint.Align.LEFT
-        for (section in cv.sectionOrder) {
-            when (section) {
-                CVSectionType.PERSONAL -> {
-                    if (cv.professionalSummary.isNotBlank()) {
-                        y = drawTraditionHeader(canvas, "Objective & Summary", y, accent, paint)
-                        y = drawWrappedText(canvas, cv.professionalSummary, 50f, y, 495f, 12f, paint, Typeface.SERIF) + 12f
-                    }
-                }
-                CVSectionType.EXPERIENCE -> {
-                    y = drawTraditionHeader(canvas, "Professional Experience", y, accent, paint)
-                    for (exp in cv.experiences) {
-                        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
-                        paint.textSize = 10f
-                        paint.color = Color.parseColor("#1C1917")
-                        canvas.drawText(exp.jobTitle, 50f, y, paint)
-
-                        paint.textAlign = Paint.Align.RIGHT
-                        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
-                        paint.textSize = 8.5f
-                        canvas.drawText(exp.dates, PAGE_WIDTH - 50f, y, paint)
-                        y += 12f
-
-                        paint.textAlign = Paint.Align.LEFT
-                        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
-                        paint.color = accent
-                        canvas.drawText(exp.company, 50f, y, paint)
-                        y += 12f
-
-                        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
-                        paint.color = Color.parseColor("#292524")
-                        y = drawWrappedText(canvas, exp.achievements, 50f, y, 495f, 11f, paint, Typeface.SERIF) + 10f
-                    }
-                }
-                CVSectionType.EDUCATION -> {
-                    y = drawTraditionHeader(canvas, "Education & Credentials", y, accent, paint)
-                    for (edu in cv.educations) {
-                        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
-                        paint.textSize = 10f
-                        paint.color = Color.parseColor("#1C1917")
-                        canvas.drawText(edu.degree, 50f, y, paint)
-
-                        paint.textAlign = Paint.Align.RIGHT
-                        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
-                        paint.textSize = 8.5f
-                        canvas.drawText(edu.dates, PAGE_WIDTH - 50f, y, paint)
-                        y += 12f
-
-                        paint.textAlign = Paint.Align.LEFT
-                        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
-                        paint.color = Color.parseColor("#44403C")
-                        canvas.drawText(edu.school, 50f, y, paint)
-                        y += 14f
-                    }
-                }
-                CVSectionType.SKILLS -> {
-                    y = drawTraditionHeader(canvas, "Core Competencies", y, accent, paint)
-                    y = drawWrappedText(canvas, cv.skills, 50f, y, 495f, 12f, paint, Typeface.SERIF) + 12f
-                }
-                CVSectionType.CUSTOM_PROJECTS -> {
-                    if (cv.projects.isNotBlank()) {
-                        y = drawTraditionHeader(canvas, "Certifications & Projects", y, accent, paint)
-                        y = drawWrappedText(canvas, cv.projects, 50f, y, 495f, 12f, paint, Typeface.SERIF) + 12f
-                    }
-                }
-                CVSectionType.LANGUAGES -> {
-                    if (cv.languages.isNotBlank()) {
-                        y = drawTraditionHeader(canvas, "Languages", y, accent, paint)
-                        y = drawWrappedText(canvas, cv.languages, 50f, y, 495f, 12f, paint, Typeface.SERIF) + 12f
-                    }
-                }
-            }
-        }
-    }
-
-    // Template 4: Continental (Europass style: Left timeline columns, structured boxes)
-    private fun drawContinentalTemplate(canvas: Canvas, cv: CVModel, accent: Int, paint: Paint) {
-        // Left color stripe
-        paint.color = accent
-        canvas.drawRect(0f, 0f, 12f, PAGE_HEIGHT.toFloat(), paint)
-
-        var y = 50f
-        paint.textAlign = Paint.Align.LEFT
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.textSize = 22f
-        paint.color = Color.parseColor("#1E293B")
-        canvas.drawText(cv.fullName, 40f, y, paint)
-
-        paint.textSize = 11f
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        paint.color = accent
-        canvas.drawText(cv.professionalTitle, 40f, y + 16f, paint)
-
-        // Contact box top right
-        paint.textSize = 8f
-        paint.color = Color.parseColor("#475569")
-        canvas.drawText("EMAIL: ${cv.email}", 350f, y - 6f, paint)
-        canvas.drawText("TEL: ${cv.phone}", 350f, y + 6f, paint)
-        canvas.drawText("LOC: ${cv.location}", 350f, y + 18f, paint)
-        y += 40f
-
-        paint.color = Color.parseColor("#CBD5E1")
-        canvas.drawLine(40f, y, PAGE_WIDTH - 40f, y, paint)
-        y += 20f
-
-        for (section in cv.sectionOrder) {
-            when (section) {
-                CVSectionType.PERSONAL -> {
-                    if (cv.professionalSummary.isNotBlank()) {
-                        y = drawContinentalRow(canvas, "PROFILE", y, accent, paint) {
-                            drawWrappedText(canvas, cv.professionalSummary, 170f, y, 380f, 12f, paint)
+                            // Achievements / Description formatted with bullet points
+                            if (exp.achievements.isNotBlank()) {
+                                mainY = drawBulletOrParagraph(canvas, exp.achievements, mainX, mainY, mainWidth, 9.5f, Color.parseColor("#475569"), 13.5f)
+                            }
+                            mainY += 10f
                         }
+                        mainY += 6f
+                    }
+                }
+                CVSectionType.EDUCATION -> {
+                    if (cv.educations.isNotEmpty()) {
+                        mainY = drawMainSectionHeader(canvas, "EDUCATION & CREDENTIALS", mainX, mainY, mainWidth, accent)
+                        for (edu in cv.educations) {
+                            if (mainY >= PAGE_HEIGHT - 50f) break
+
+                            paint.color = Color.parseColor("#0F172A")
+                            paint.textSize = 11f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(edu.degree, mainX, mainY, paint)
+
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#64748B")
+                                textSize = 9.5f
+                                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(edu.dates, mainX + mainWidth, mainY, datePaint)
+                            mainY += 13f
+
+                            paint.color = Color.parseColor("#475569")
+                            paint.textSize = 9.5f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                            canvas.drawText(edu.school, mainX, mainY, paint)
+                            mainY += 15f
+                        }
+                        mainY += 6f
+                    }
+                }
+                CVSectionType.CUSTOM_PROJECTS -> {
+                    if (cv.projects.isNotBlank()) {
+                        mainY = drawMainSectionHeader(canvas, "KEY PROJECTS & ACHIEVEMENTS", mainX, mainY, mainWidth, accent)
+                        mainY = drawBulletOrParagraph(canvas, cv.projects, mainX, mainY, mainWidth, 9.5f, Color.parseColor("#334155"), 13.5f)
+                        mainY += 14f
+                    }
+                }
+                else -> Unit
+            }
+        }
+    }
+
+    // =========================================================================
+    // TEMPLATE 2: CLARITY (Top ATS Single-Column Layout)
+    // Clean, minimalist, machine-parsable, perfect for corporate job applications
+    // =========================================================================
+    private fun drawClarityTemplate(canvas: Canvas, cv: CVModel, accent: Int) {
+        val marginX = 44f
+        val contentWidth = PAGE_WIDTH - (marginX * 2f)
+        var y = 46f
+
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Full Name (Centered & Bold)
+        paint.color = Color.parseColor("#0F172A")
+        paint.textSize = 24f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.textAlign = Paint.Align.CENTER
+        val displayName = cv.fullName
+        if (displayName.isNotBlank()) {
+            canvas.drawText(displayName, PAGE_WIDTH / 2f, y, paint)
+            y += 16f
+        }
+
+        // Professional Title
+        val displayTitle = cv.professionalTitle
+        if (displayTitle.isNotBlank()) {
+            paint.color = accent
+            paint.textSize = 12f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            canvas.drawText(displayTitle.uppercase(), PAGE_WIDTH / 2f, y, paint)
+            y += 14f
+        }
+
+        // Clean Contact Header Bar (Pipe-delimited)
+        paint.color = Color.parseColor("#475569")
+        paint.textSize = 9f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        val contacts = listOf(cv.email, cv.phone, cv.location, cv.website).filter { it.isNotBlank() }
+        val contactLine = contacts.joinToString("   •   ")
+        canvas.drawText(contactLine, PAGE_WIDTH / 2f, y, paint)
+        y += 14f
+
+        // Top horizontal divider
+        val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#CBD5E1")
+            strokeWidth = 1f
+        }
+        canvas.drawLine(marginX, y, marginX + contentWidth, y, divPaint)
+        y += 20f
+
+        paint.textAlign = Paint.Align.LEFT
+
+        // Render sections according to user order
+        for (sec in cv.sectionOrder) {
+            if (y >= PAGE_HEIGHT - 60f) break
+
+            when (sec) {
+                CVSectionType.PERSONAL -> {
+                    if (cv.professionalSummary.isNotBlank()) {
+                        y = drawAtsHeader(canvas, "PROFESSIONAL SUMMARY", marginX, y, contentWidth, accent)
+                        y = drawParagraph(canvas, cv.professionalSummary, marginX, y, contentWidth, 10f, Color.parseColor("#334155"), 14.5f)
+                        y += 14f
                     }
                 }
                 CVSectionType.EXPERIENCE -> {
-                    y = drawContinentalRow(canvas, "WORK EXPERIENCE", y, accent, paint) {
+                    if (cv.experiences.isNotEmpty()) {
+                        y = drawAtsHeader(canvas, "PROFESSIONAL EXPERIENCE", marginX, y, contentWidth, accent)
+                        for (exp in cv.experiences) {
+                            if (y >= PAGE_HEIGHT - 50f) break
+
+                            // Job Title and Dates
+                            paint.color = Color.parseColor("#0F172A")
+                            paint.textSize = 11.5f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(exp.jobTitle, marginX, y, paint)
+
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#64748B")
+                                textSize = 10f
+                                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(exp.dates, marginX + contentWidth, y, datePaint)
+                            y += 14f
+
+                            // Company
+                            paint.color = accent
+                            paint.textSize = 10f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(exp.company, marginX, y, paint)
+                            y += 12f
+
+                            // Achievements
+                            if (exp.achievements.isNotBlank()) {
+                                y = drawBulletOrParagraph(canvas, exp.achievements, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                            }
+                            y += 10f
+                        }
+                        y += 6f
+                    }
+                }
+                CVSectionType.EDUCATION -> {
+                    if (cv.educations.isNotEmpty()) {
+                        y = drawAtsHeader(canvas, "EDUCATION", marginX, y, contentWidth, accent)
+                        for (edu in cv.educations) {
+                            if (y >= PAGE_HEIGHT - 50f) break
+
+                            paint.color = Color.parseColor("#0F172A")
+                            paint.textSize = 11f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(edu.degree, marginX, y, paint)
+
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#64748B")
+                                textSize = 9.5f
+                                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(edu.dates, marginX + contentWidth, y, datePaint)
+                            y += 13f
+
+                            paint.color = Color.parseColor("#475569")
+                            paint.textSize = 9.5f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                            canvas.drawText(edu.school, marginX, y, paint)
+                            y += 14f
+                        }
+                        y += 6f
+                    }
+                }
+                CVSectionType.SKILLS -> {
+                    if (cv.skills.isNotBlank()) {
+                        y = drawAtsHeader(canvas, "TECHNICAL SKILLS & COMPETENCIES", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.skills, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                        y += 14f
+                    }
+                }
+                CVSectionType.CUSTOM_PROJECTS -> {
+                    if (cv.projects.isNotBlank()) {
+                        y = drawAtsHeader(canvas, "PROJECTS & CERTIFICATIONS", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.projects, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                        y += 14f
+                    }
+                }
+                CVSectionType.LANGUAGES -> {
+                    if (cv.languages.isNotBlank()) {
+                        y = drawAtsHeader(canvas, "LANGUAGES", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.languages, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                        y += 14f
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // TEMPLATE 3: TRADITION (Formal Classic Biodata / Academic Serif Resume)
+    // Elegant typography, clean double-borders, traditional section lines
+    // =========================================================================
+    private fun drawTraditionTemplate(canvas: Canvas, cv: CVModel, accent: Int) {
+        val marginX = 48f
+        val contentWidth = PAGE_WIDTH - (marginX * 2f)
+        var y = 48f
+
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Outer formal border frame
+        val borderFrame = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#D6D3D1")
+            strokeWidth = 1f
+            style = Paint.Style.STROKE
+        }
+        canvas.drawRect(24f, 24f, PAGE_WIDTH - 24f, PAGE_HEIGHT - 24f, borderFrame)
+
+        // Header: Name (Serif, Small caps styled letter-spacing)
+        paint.color = Color.parseColor("#1C1917")
+        paint.textSize = 24f
+        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+        paint.textAlign = Paint.Align.CENTER
+        val displayName = cv.fullName
+        if (displayName.isNotBlank()) {
+            canvas.drawText(displayName.uppercase(), PAGE_WIDTH / 2f, y, paint)
+            y += 16f
+        }
+
+        // Professional Title
+        val displayTitle = cv.professionalTitle
+        if (displayTitle.isNotBlank()) {
+            paint.color = accent
+            paint.textSize = 11.5f
+            paint.typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
+            canvas.drawText(displayTitle, PAGE_WIDTH / 2f, y, paint)
+            y += 14f
+        }
+
+        // Contact info
+        paint.color = Color.parseColor("#57534E")
+        paint.textSize = 9f
+        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+        val contacts = listOf(cv.email, cv.phone, cv.location, cv.website).filter { it.isNotBlank() }
+        canvas.drawText(contacts.joinToString("   ♦   "), PAGE_WIDTH / 2f, y, paint)
+        y += 14f
+
+        // Accent divider
+        val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+            strokeWidth = 1.2f
+        }
+        canvas.drawLine(marginX + 20f, y, marginX + contentWidth - 20f, y, divPaint)
+        y += 22f
+
+        paint.textAlign = Paint.Align.LEFT
+
+        for (sec in cv.sectionOrder) {
+            if (y >= PAGE_HEIGHT - 65f) break
+
+            when (sec) {
+                CVSectionType.PERSONAL -> {
+                    if (cv.professionalSummary.isNotBlank()) {
+                        y = drawTraditionHeader(canvas, "Executive Profile", marginX, y, contentWidth, accent)
+                        y = drawParagraph(canvas, cv.professionalSummary, marginX, y, contentWidth, 9.5f, Color.parseColor("#292524"), 14f, Typeface.SERIF)
+                        y += 14f
+                    }
+                }
+                CVSectionType.EXPERIENCE -> {
+                    if (cv.experiences.isNotEmpty()) {
+                        y = drawTraditionHeader(canvas, "Professional History", marginX, y, contentWidth, accent)
+                        for (exp in cv.experiences) {
+                            if (y >= PAGE_HEIGHT - 55f) break
+
+                            paint.color = Color.parseColor("#1C1917")
+                            paint.textSize = 11f
+                            paint.typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+                            canvas.drawText(exp.jobTitle, marginX, y, paint)
+
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#78716C")
+                                textSize = 9.5f
+                                typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(exp.dates, marginX + contentWidth, y, datePaint)
+                            y += 13f
+
+                            paint.color = accent
+                            paint.textSize = 10f
+                            paint.typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
+                            canvas.drawText(exp.company, marginX, y, paint)
+                            y += 12f
+
+                            if (exp.achievements.isNotBlank()) {
+                                y = drawBulletOrParagraph(canvas, exp.achievements, marginX, y, contentWidth, 9.5f, Color.parseColor("#292524"), 13.5f, Typeface.SERIF)
+                            }
+                            y += 10f
+                        }
+                        y += 6f
+                    }
+                }
+                CVSectionType.EDUCATION -> {
+                    if (cv.educations.isNotEmpty()) {
+                        y = drawTraditionHeader(canvas, "Education & Academics", marginX, y, contentWidth, accent)
+                        for (edu in cv.educations) {
+                            if (y >= PAGE_HEIGHT - 55f) break
+
+                            paint.color = Color.parseColor("#1C1917")
+                            paint.textSize = 11f
+                            paint.typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+                            canvas.drawText(edu.degree, marginX, y, paint)
+
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#78716C")
+                                textSize = 9.5f
+                                typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(edu.dates, marginX + contentWidth, y, datePaint)
+                            y += 13f
+
+                            paint.color = Color.parseColor("#44403C")
+                            paint.textSize = 9.5f
+                            paint.typeface = Typeface.create(Typeface.SERIF, Typeface.NORMAL)
+                            canvas.drawText(edu.school, marginX, y, paint)
+                            y += 14f
+                        }
+                        y += 6f
+                    }
+                }
+                CVSectionType.SKILLS -> {
+                    if (cv.skills.isNotBlank()) {
+                        y = drawTraditionHeader(canvas, "Core Competencies", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.skills, marginX, y, contentWidth, 9.5f, Color.parseColor("#292524"), 13.5f, Typeface.SERIF)
+                        y += 14f
+                    }
+                }
+                CVSectionType.CUSTOM_PROJECTS -> {
+                    if (cv.projects.isNotBlank()) {
+                        y = drawTraditionHeader(canvas, "Certifications & Research", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.projects, marginX, y, contentWidth, 9.5f, Color.parseColor("#292524"), 13.5f, Typeface.SERIF)
+                        y += 14f
+                    }
+                }
+                CVSectionType.LANGUAGES -> {
+                    if (cv.languages.isNotBlank()) {
+                        y = drawTraditionHeader(canvas, "Languages", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.languages, marginX, y, contentWidth, 9.5f, Color.parseColor("#292524"), 13.5f, Typeface.SERIF)
+                        y += 14f
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // TEMPLATE 4: CONTINENTAL (Europass Modern Structured Layout)
+    // Left column: Timeline categories (130pt). Right column: Structured data.
+    // =========================================================================
+    private fun drawContinentalTemplate(canvas: Canvas, cv: CVModel, accent: Int) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        var y = 44f
+
+        // Europass left accent vertical border
+        val leftBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+        }
+        canvas.drawRect(0f, 0f, 8f, PAGE_HEIGHT.toFloat(), leftBorder)
+
+        val colLabelX = 36f
+        val colLabelWidth = 120f
+        val colBodyX = 170f
+        val colBodyWidth = PAGE_WIDTH - colBodyX - 36f
+
+        // Header Top: Name and Title
+        paint.color = Color.parseColor("#0F172A")
+        paint.textSize = 24f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.textAlign = Paint.Align.LEFT
+        val displayName = cv.fullName
+        if (displayName.isNotBlank()) {
+            canvas.drawText(displayName, colBodyX, y, paint)
+            y += 18f
+        }
+
+        val displayTitle = cv.professionalTitle
+        if (displayTitle.isNotBlank()) {
+            paint.color = accent
+            paint.textSize = 12f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            canvas.drawText(displayTitle, colBodyX, y, paint)
+            y += 18f
+        }
+
+        // Top contact box row
+        val contacts = listOfNotNull(
+            if (cv.email.isNotBlank()) "Email: ${cv.email}" else null,
+            if (cv.phone.isNotBlank()) "Tel: ${cv.phone}" else null,
+            if (cv.location.isNotBlank()) "Location: ${cv.location}" else null,
+            if (cv.website.isNotBlank()) "Portfolio: ${cv.website}" else null
+        )
+        if (contacts.isNotEmpty()) {
+            paint.color = Color.parseColor("#64748B")
+            paint.textSize = 8.5f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            canvas.drawText(contacts.joinToString("   |   "), colBodyX, y, paint)
+            y += 16f
+        }
+
+        val divPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E2E8F0")
+            strokeWidth = 1f
+        }
+        canvas.drawLine(colLabelX, y, PAGE_WIDTH - 36f, y, divPaint)
+        y += 20f
+
+        for (sec in cv.sectionOrder) {
+            if (y >= PAGE_HEIGHT - 60f) break
+
+            when (sec) {
+                CVSectionType.PERSONAL -> {
+                    if (cv.professionalSummary.isNotBlank()) {
+                        drawContinentalCategory(canvas, "PROFILE", colLabelX, y, accent)
+                        val endY = drawParagraph(canvas, cv.professionalSummary, colBodyX, y, colBodyWidth, 10f, Color.parseColor("#334155"), 14f)
+                        y = maxOf(y + 24f, endY) + 16f
+                        drawContinentalDivider(canvas, colLabelX, y)
+                        y += 16f
+                    }
+                }
+                CVSectionType.EXPERIENCE -> {
+                    if (cv.experiences.isNotEmpty()) {
+                        drawContinentalCategory(canvas, "WORK\nEXPERIENCE", colLabelX, y, accent)
                         var subY = y
                         for (exp in cv.experiences) {
-                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                            paint.textSize = 10f
+                            if (subY >= PAGE_HEIGHT - 50f) break
+
                             paint.color = Color.parseColor("#0F172A")
-                            canvas.drawText(exp.jobTitle, 170f, subY, paint)
+                            paint.textSize = 11.5f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(exp.jobTitle, colBodyX, subY, paint)
+
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#64748B")
+                                textSize = 9.5f
+                                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(exp.dates, colBodyX + colBodyWidth, subY, datePaint)
+                            subY += 13f
+
+                            paint.color = accent
+                            paint.textSize = 10f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(exp.company, colBodyX, subY, paint)
                             subY += 12f
 
-                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                            paint.textSize = 8.5f
-                            paint.color = Color.parseColor("#64748B")
-                            canvas.drawText("${exp.company} | ${exp.dates}", 170f, subY, paint)
-                            subY += 12f
-
-                            paint.color = Color.parseColor("#334155")
-                            subY = drawWrappedText(canvas, exp.achievements, 170f, subY, 380f, 11f, paint) + 8f
+                            if (exp.achievements.isNotBlank()) {
+                                subY = drawBulletOrParagraph(canvas, exp.achievements, colBodyX, subY, colBodyWidth, 9.5f, Color.parseColor("#334155"), 13.5f)
+                            }
+                            subY += 10f
                         }
-                        subY
+                        y = maxOf(y + 24f, subY) + 8f
+                        drawContinentalDivider(canvas, colLabelX, y)
+                        y += 16f
                     }
                 }
                 CVSectionType.EDUCATION -> {
-                    y = drawContinentalRow(canvas, "EDUCATION", y, accent, paint) {
+                    if (cv.educations.isNotEmpty()) {
+                        drawContinentalCategory(canvas, "EDUCATION &\nTRAINING", colLabelX, y, accent)
                         var subY = y
                         for (edu in cv.educations) {
-                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                            paint.textSize = 10f
-                            paint.color = Color.parseColor("#0F172A")
-                            canvas.drawText(edu.degree, 170f, subY, paint)
-                            subY += 12f
+                            if (subY >= PAGE_HEIGHT - 50f) break
 
+                            paint.color = Color.parseColor("#0F172A")
+                            paint.textSize = 11f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(edu.degree, colBodyX, subY, paint)
+
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#64748B")
+                                textSize = 9.5f
+                                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(edu.dates, colBodyX + colBodyWidth, subY, datePaint)
+                            subY += 13f
+
+                            paint.color = Color.parseColor("#475569")
+                            paint.textSize = 9.5f
                             paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                            paint.textSize = 8.5f
-                            paint.color = Color.parseColor("#64748B")
-                            canvas.drawText("${edu.school} | ${edu.dates}", 170f, subY, paint)
+                            canvas.drawText(edu.school, colBodyX, subY, paint)
                             subY += 14f
                         }
-                        subY
+                        y = maxOf(y + 24f, subY) + 8f
+                        drawContinentalDivider(canvas, colLabelX, y)
+                        y += 16f
                     }
                 }
                 CVSectionType.SKILLS -> {
-                    y = drawContinentalRow(canvas, "COMPETENCES", y, accent, paint) {
-                        drawWrappedText(canvas, cv.skills, 170f, y, 380f, 12f, paint)
+                    if (cv.skills.isNotBlank()) {
+                        drawContinentalCategory(canvas, "DIGITAL\nSKILLS", colLabelX, y, accent)
+                        val endY = drawBulletOrParagraph(canvas, cv.skills, colBodyX, y, colBodyWidth, 9.5f, Color.parseColor("#334155"), 13.5f)
+                        y = maxOf(y + 24f, endY) + 12f
+                        drawContinentalDivider(canvas, colLabelX, y)
+                        y += 16f
                     }
                 }
                 CVSectionType.CUSTOM_PROJECTS -> {
                     if (cv.projects.isNotBlank()) {
-                        y = drawContinentalRow(canvas, "PROJECTS", y, accent, paint) {
-                            drawWrappedText(canvas, cv.projects, 170f, y, 380f, 12f, paint)
-                        }
+                        drawContinentalCategory(canvas, "PROJECTS", colLabelX, y, accent)
+                        val endY = drawBulletOrParagraph(canvas, cv.projects, colBodyX, y, colBodyWidth, 9.5f, Color.parseColor("#334155"), 13.5f)
+                        y = maxOf(y + 24f, endY) + 12f
+                        drawContinentalDivider(canvas, colLabelX, y)
+                        y += 16f
                     }
                 }
                 CVSectionType.LANGUAGES -> {
                     if (cv.languages.isNotBlank()) {
-                        y = drawContinentalRow(canvas, "LANGUAGES", y, accent, paint) {
-                            drawWrappedText(canvas, cv.languages, 170f, y, 380f, 12f, paint)
-                        }
+                        drawContinentalCategory(canvas, "LANGUAGE\nSKILLS", colLabelX, y, accent)
+                        val endY = drawBulletOrParagraph(canvas, cv.languages, colBodyX, y, colBodyWidth, 9.5f, Color.parseColor("#334155"), 13.5f)
+                        y = maxOf(y + 24f, endY) + 12f
+                        drawContinentalDivider(canvas, colLabelX, y)
+                        y += 16f
                     }
                 }
             }
         }
     }
 
-    private fun drawSidebarSection(canvas: Canvas, title: String, startY: Float, accent: Int, paint: Paint, content: () -> Float): Float {
-        var y = startY
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.textSize = 8f
-        paint.letterSpacing = 0.1f
-        paint.color = Color.parseColor("#808A85")
-        canvas.drawText(title, 36f, y, paint)
-        y += 4f
-        paint.color = Color.parseColor("#D4DCD7")
-        canvas.drawLine(36f, y, 170f, y, paint)
-        y += 12f
-        paint.letterSpacing = 0f
-        val endY = content()
-        return maxOf(y, endY) + 14f
-    }
+    // =========================================================================
+    // HELPER LAYOUT & TYPOGRAPHY RENDERING ENGINES
+    // Uses Android StaticLayout for 100% accurate kerning, wrap & line-height
+    // =========================================================================
 
-    private fun drawContactLine(canvas: Canvas, text: String, y: Float, paint: Paint): Float {
-        if (text.isBlank()) return y
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        paint.textSize = 8f
-        paint.color = Color.parseColor("#3B4540")
-        canvas.drawText(text, 36f, y, paint)
-        return y + 11f
-    }
+    private fun drawSidebarSectionHeader(canvas: Canvas, title: String, x: Float, y: Float, width: Float, accent: Int): Float {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+            textSize = 9f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            letterSpacing = 0.08f
+        }
+        canvas.drawText(title, x, y, paint)
 
-    private fun drawContentSection(canvas: Canvas, title: String, startY: Float, accent: Int, paint: Paint, content: () -> Float): Float {
-        var y = startY
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.textSize = 8.5f
-        paint.letterSpacing = 0.1f
-        paint.color = accent
-        canvas.drawText(title, 200f, y, paint)
-        y += 4f
-        paint.color = Color.parseColor("#DCE4DF")
-        canvas.drawLine(200f, y, PAGE_WIDTH - 36f, y, paint)
-        y += 14f
-        paint.letterSpacing = 0f
-        val endY = content()
-        return maxOf(y, endY) + 16f
-    }
-
-    private fun drawLinearHeader(canvas: Canvas, title: String, y: Float, accent: Int, paint: Paint): Float {
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.textSize = 9f
-        paint.letterSpacing = 0.08f
-        paint.color = accent
-        canvas.drawText(title, 40f, y, paint)
-        val lineY = y + 4f
-        paint.color = Color.parseColor("#E5E7EB")
-        canvas.drawLine(40f, lineY, PAGE_WIDTH - 40f, lineY, paint)
-        paint.letterSpacing = 0f
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E2E8F0")
+            strokeWidth = 0.75f
+        }
+        canvas.drawLine(x, y + 4f, x + width, y + 4f, linePaint)
         return y + 16f
     }
 
-    private fun drawTraditionHeader(canvas: Canvas, title: String, y: Float, accent: Int, paint: Paint): Float {
-        paint.typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
-        paint.textSize = 9.5f
-        paint.letterSpacing = 0.05f
-        paint.color = accent
-        canvas.drawText(title, 50f, y, paint)
-        val lineY = y + 4f
-        paint.color = Color.parseColor("#D6D3D1")
-        canvas.drawLine(50f, lineY, PAGE_WIDTH - 50f, lineY, paint)
-        paint.letterSpacing = 0f
+    private fun drawSidebarContactItem(canvas: Canvas, text: String, x: Float, y: Float, width: Float): Float {
+        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#334155")
+            textSize = 8.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        }
+        val layout = StaticLayout.Builder.obtain(text, 0, text.length, textPaint, width.toInt())
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setLineSpacing(1f, 1.15f)
+            .setIncludePad(false)
+            .build()
+
+        canvas.save()
+        canvas.translate(x, y - (textPaint.textSize * 0.8f))
+        layout.draw(canvas)
+        canvas.restore()
+
+        return y + layout.height + 6f
+    }
+
+    private fun drawSidebarBulletItem(canvas: Canvas, text: String, x: Float, y: Float, width: Float): Float {
+        val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#94A3B8")
+        }
+        canvas.drawCircle(x + 2f, y - 2.5f, 1.8f, dotPaint)
+
+        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#334155")
+            textSize = 8.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+        }
+        val textX = x + 10f
+        val textWidth = width - 10f
+
+        val layout = StaticLayout.Builder.obtain(text, 0, text.length, textPaint, textWidth.toInt())
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setLineSpacing(1f, 1.15f)
+            .setIncludePad(false)
+            .build()
+
+        canvas.save()
+        canvas.translate(textX, y - (textPaint.textSize * 0.8f))
+        layout.draw(canvas)
+        canvas.restore()
+
+        return y + layout.height + 5f
+    }
+
+    private fun drawMainSectionHeader(canvas: Canvas, title: String, x: Float, y: Float, width: Float, accent: Int): Float {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+            textSize = 10f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            letterSpacing = 0.06f
+        }
+        canvas.drawText(title, x, y, paint)
+
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#E2E8F0")
+            strokeWidth = 0.8f
+        }
+        canvas.drawLine(x, y + 4f, x + width, y + 4f, linePaint)
         return y + 16f
     }
 
-    private fun drawContinentalRow(canvas: Canvas, title: String, y: Float, accent: Int, paint: Paint, contentBlock: () -> Float): Float {
-        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        paint.textSize = 8.5f
-        paint.letterSpacing = 0.06f
-        paint.color = accent
-        canvas.drawText(title, 40f, y, paint)
-        paint.letterSpacing = 0f
+    private fun drawAtsHeader(canvas: Canvas, title: String, x: Float, y: Float, width: Float, accent: Int): Float {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+            textSize = 10.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            letterSpacing = 0.05f
+        }
+        canvas.drawText(title, x, y, paint)
 
-        val endY = contentBlock()
-        val nextY = maxOf(y + 20f, endY) + 14f
-        paint.color = Color.parseColor("#F1F5F9")
-        canvas.drawLine(40f, nextY - 6f, PAGE_WIDTH - 40f, nextY - 6f, paint)
-        return nextY
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#CBD5E1")
+            strokeWidth = 0.8f
+        }
+        canvas.drawLine(x, y + 4f, x + width, y + 4f, linePaint)
+        return y + 16f
     }
 
-    private fun drawWrappedText(
+    private fun drawTraditionHeader(canvas: Canvas, title: String, x: Float, y: Float, width: Float, accent: Int): Float {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+            textSize = 11f
+            typeface = Typeface.create(Typeface.SERIF, Typeface.BOLD)
+            letterSpacing = 0.03f
+        }
+        canvas.drawText(title, x, y, paint)
+
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#D6D3D1")
+            strokeWidth = 0.8f
+        }
+        canvas.drawLine(x, y + 4f, x + width, y + 4f, linePaint)
+        return y + 16f
+    }
+
+    private fun drawContinentalCategory(canvas: Canvas, title: String, x: Float, y: Float, accent: Int) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = accent
+            textSize = 9.5f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            letterSpacing = 0.04f
+        }
+        val lines = title.split("\n")
+        var currentY = y
+        for (line in lines) {
+            canvas.drawText(line, x, currentY, paint)
+            currentY += 11f
+        }
+    }
+
+    private fun drawContinentalDivider(canvas: Canvas, x: Float, y: Float) {
+        val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#F1F5F9")
+            strokeWidth = 0.8f
+        }
+        canvas.drawLine(x, y, PAGE_WIDTH - 36f, y, linePaint)
+    }
+
+    /**
+     * Renders clean paragraphs using Android's StaticLayout to ensure zero clipped words,
+     * consistent line-height, and crisp text rendering.
+     */
+    private fun drawParagraph(
         canvas: Canvas,
         text: String,
         x: Float,
-        startY: Float,
-        maxWidth: Float,
-        lineHeight: Float,
-        paint: Paint,
+        y: Float,
+        width: Float,
+        textSize: Float,
+        colorInt: Int,
+        lineSpacingExtra: Float = 3f,
         fontFamily: Typeface = Typeface.DEFAULT
     ): Float {
-        paint.typeface = Typeface.create(fontFamily, Typeface.NORMAL)
-        paint.textSize = 8f
-        paint.color = Color.parseColor("#2F3833")
+        if (text.isBlank()) return y
 
-        val words = text.split("\\s+".toRegex())
-        var currentLine = StringBuilder()
-        var y = startY
+        val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = colorInt
+            this.textSize = textSize
+            typeface = Typeface.create(fontFamily, Typeface.NORMAL)
+        }
 
-        for (word in words) {
-            val testLine = if (currentLine.isEmpty()) word else "$currentLine $word"
-            val width = paint.measureText(testLine)
-            if (width > maxWidth && currentLine.isNotEmpty()) {
-                canvas.drawText(currentLine.toString(), x, y, paint)
-                y += lineHeight
-                currentLine = StringBuilder(word)
-            } else {
-                currentLine = StringBuilder(testLine)
+        val layout = StaticLayout.Builder.obtain(text.trim(), 0, text.trim().length, textPaint, width.toInt())
+            .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+            .setLineSpacing(lineSpacingExtra, 1f)
+            .setIncludePad(false)
+            .build()
+
+        canvas.save()
+        canvas.translate(x, y - (textPaint.textSize * 0.8f))
+        layout.draw(canvas)
+        canvas.restore()
+
+        return y + layout.height
+    }
+
+    /**
+     * Intelligently renders achievements, skills, or projects.
+     * If multiple lines or bullet points are present, formats each bullet point with
+     * an indent and bullet marker. Otherwise renders as a crisp paragraph.
+     */
+    private fun drawBulletOrParagraph(
+        canvas: Canvas,
+        content: String,
+        x: Float,
+        startY: Float,
+        width: Float,
+        textSize: Float,
+        colorInt: Int,
+        lineHeight: Float,
+        fontFamily: Typeface = Typeface.DEFAULT
+    ): Float {
+        val trimmed = content.trim()
+        val rawLines = trimmed.split("\n").filter { it.isNotBlank() }
+
+        // If multiple lines, render as structured bullet points
+        if (rawLines.size > 1 || rawLines.any { it.trim().startsWith("•") || it.trim().startsWith("-") }) {
+            var y = startY
+            for (line in rawLines) {
+                if (y >= PAGE_HEIGHT - 45f) break
+
+                val cleanLine = line.trim().removePrefix("•").removePrefix("-").trim()
+                if (cleanLine.isBlank()) continue
+
+                // Bullet circle
+                val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.parseColor("#94A3B8")
+                }
+                canvas.drawCircle(x + 3f, y - 2.5f, 2f, dotPaint)
+
+                // Bullet Text
+                val textX = x + 12f
+                val textWidth = width - 12f
+
+                val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = colorInt
+                    this.textSize = textSize
+                    typeface = Typeface.create(fontFamily, Typeface.NORMAL)
+                }
+
+                val layout = StaticLayout.Builder.obtain(cleanLine, 0, cleanLine.length, textPaint, textWidth.toInt())
+                    .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                    .setLineSpacing(2.5f, 1f)
+                    .setIncludePad(false)
+                    .build()
+
+                canvas.save()
+                canvas.translate(textX, y - (textPaint.textSize * 0.8f))
+                layout.draw(canvas)
+                canvas.restore()
+
+                y += layout.height + 4f
+            }
+            return y
+        } else {
+            return drawParagraph(canvas, trimmed, x, startY, width, textSize, colorInt, 3f, fontFamily)
+        }
+    }
+
+    // =========================================================================
+    // TEMPLATE 5: APEX (Modern Tech & Engineering Layout)
+    // Full-width modern top banner with white name and skills badge pills
+    // =========================================================================
+    private fun drawApexTemplate(canvas: Canvas, cv: CVModel, accent: Int) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Bold top banner
+        val bannerHeight = 110f
+        paint.color = accent
+        canvas.drawRect(0f, 0f, PAGE_WIDTH.toFloat(), bannerHeight, paint)
+
+        // Banner content
+        var topY = 38f
+        paint.color = Color.WHITE
+        paint.textSize = 24f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.textAlign = Paint.Align.LEFT
+        if (cv.fullName.isNotBlank()) {
+            canvas.drawText(cv.fullName, 36f, topY, paint)
+            topY += 18f
+        }
+
+        if (cv.professionalTitle.isNotBlank()) {
+            paint.color = Color.parseColor("#E0E7FF")
+            paint.textSize = 12f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            canvas.drawText(cv.professionalTitle, 36f, topY, paint)
+            topY += 16f
+        }
+
+        val contacts = listOf(cv.email, cv.phone, cv.location, cv.website).filter { it.isNotBlank() }
+        if (contacts.isNotEmpty()) {
+            paint.color = Color.parseColor("#C7D2FE")
+            paint.textSize = 8.5f
+            canvas.drawText(contacts.joinToString("   •   "), 36f, topY, paint)
+        }
+
+        // QR Code in top right if enabled
+        if (cv.showQrCode && cv.website.isNotBlank()) {
+            val qr = QrCodeGenerator.generateQrBitmap(cv.website, 64)
+            if (qr != null) {
+                canvas.drawBitmap(qr, PAGE_WIDTH - 90f, 22f, null)
             }
         }
-        if (currentLine.isNotEmpty()) {
-            canvas.drawText(currentLine.toString(), x, y, paint)
-            y += lineHeight
+
+        var y = bannerHeight + 24f
+        val marginX = 36f
+        val contentWidth = PAGE_WIDTH - (marginX * 2f)
+
+        for (sec in cv.sectionOrder) {
+            if (y >= PAGE_HEIGHT - 60f) break
+
+            when (sec) {
+                CVSectionType.PERSONAL -> {
+                    if (cv.professionalSummary.isNotBlank()) {
+                        y = drawMainSectionHeader(canvas, "EXECUTIVE SUMMARY", marginX, y, contentWidth, accent)
+                        y = drawParagraph(canvas, cv.professionalSummary, marginX, y, contentWidth, 10f, Color.parseColor("#334155"), 14.5f)
+                        y += 14f
+                    }
+                }
+                CVSectionType.EXPERIENCE -> {
+                    if (cv.experiences.isNotEmpty()) {
+                        y = drawMainSectionHeader(canvas, "EXPERIENCE & IMPACT", marginX, y, contentWidth, accent)
+                        for (exp in cv.experiences) {
+                            if (y >= PAGE_HEIGHT - 50f) break
+
+                            paint.color = Color.parseColor("#0F172A")
+                            paint.textSize = 11.5f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(exp.jobTitle, marginX, y, paint)
+
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#64748B")
+                                textSize = 9.5f
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(exp.dates, marginX + contentWidth, y, datePaint)
+                            y += 14f
+
+                            paint.color = accent
+                            paint.textSize = 10f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(exp.company, marginX, y, paint)
+                            y += 12f
+
+                            if (exp.achievements.isNotBlank()) {
+                                y = drawBulletOrParagraph(canvas, exp.achievements, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                            }
+                            y += 10f
+                        }
+                        y += 6f
+                    }
+                }
+                CVSectionType.EDUCATION -> {
+                    if (cv.educations.isNotEmpty()) {
+                        y = drawMainSectionHeader(canvas, "EDUCATION", marginX, y, contentWidth, accent)
+                        for (edu in cv.educations) {
+                            if (y >= PAGE_HEIGHT - 50f) break
+
+                            paint.color = Color.parseColor("#0F172A")
+                            paint.textSize = 11f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(edu.degree, marginX, y, paint)
+
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#64748B")
+                                textSize = 9.5f
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(edu.dates, marginX + contentWidth, y, datePaint)
+                            y += 13f
+
+                            paint.color = Color.parseColor("#475569")
+                            paint.textSize = 9.5f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                            canvas.drawText(edu.school, marginX, y, paint)
+                            y += 14f
+                        }
+                        y += 6f
+                    }
+                }
+                CVSectionType.SKILLS -> {
+                    if (cv.skills.isNotBlank()) {
+                        y = drawMainSectionHeader(canvas, "TECHNICAL STACK & SKILLS", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.skills, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                        y += 14f
+                    }
+                }
+                CVSectionType.CUSTOM_PROJECTS -> {
+                    if (cv.projects.isNotBlank()) {
+                        y = drawMainSectionHeader(canvas, "PROJECTS & CERTIFICATIONS", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.projects, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                        y += 14f
+                    }
+                }
+                CVSectionType.LANGUAGES -> {
+                    if (cv.languages.isNotBlank()) {
+                        y = drawMainSectionHeader(canvas, "LANGUAGES", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.languages, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                        y += 14f
+                    }
+                }
+            }
         }
-        return y
+    }
+
+    // =========================================================================
+    // TEMPLATE 6: SUMMIT (Executive Minimalist - Teal Accent, Refined Spacing)
+    // Clean corporate grid with subtle boxed metadata
+    // =========================================================================
+    private fun drawSummitTemplate(canvas: Canvas, cv: CVModel, accent: Int) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val marginX = 42f
+        val contentWidth = PAGE_WIDTH - (marginX * 2f)
+        var y = 46f
+
+        // Top decorative accent pillar
+        val pillarPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = accent }
+        canvas.drawRect(marginX, y, marginX + 4f, y + 40f, pillarPaint)
+
+        // Name & Title indented past pillar
+        paint.color = Color.parseColor("#0F172A")
+        paint.textSize = 24f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.textAlign = Paint.Align.LEFT
+        if (cv.fullName.isNotBlank()) {
+            canvas.drawText(cv.fullName, marginX + 14f, y + 16f, paint)
+        }
+        if (cv.professionalTitle.isNotBlank()) {
+            paint.color = accent
+            paint.textSize = 11.5f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            canvas.drawText(cv.professionalTitle.uppercase(), marginX + 14f, y + 34f, paint)
+        }
+        y += 52f
+
+        // Contact info pill container
+        val contacts = listOf(cv.email, cv.phone, cv.location, cv.website).filter { it.isNotBlank() }
+        if (contacts.isNotEmpty()) {
+            val contactBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#F0FDFA")
+            }
+            val contactBorder = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.parseColor("#CCFBF1")
+                style = Paint.Style.STROKE
+                strokeWidth = 0.8f
+            }
+            canvas.drawRoundRect(marginX, y, marginX + contentWidth, y + 22f, 6f, 6f, contactBg)
+            canvas.drawRoundRect(marginX, y, marginX + contentWidth, y + 22f, 6f, 6f, contactBorder)
+
+            paint.color = Color.parseColor("#0F766E")
+            paint.textSize = 8.5f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            canvas.drawText(contacts.joinToString("   |   "), marginX + 12f, y + 14f, paint)
+            y += 34f
+        }
+
+        for (sec in cv.sectionOrder) {
+            if (y >= PAGE_HEIGHT - 60f) break
+
+            when (sec) {
+                CVSectionType.PERSONAL -> {
+                    if (cv.professionalSummary.isNotBlank()) {
+                        y = drawAtsHeader(canvas, "EXECUTIVE PROFILE", marginX, y, contentWidth, accent)
+                        y = drawParagraph(canvas, cv.professionalSummary, marginX, y, contentWidth, 10f, Color.parseColor("#334155"), 14f)
+                        y += 14f
+                    }
+                }
+                CVSectionType.EXPERIENCE -> {
+                    if (cv.experiences.isNotEmpty()) {
+                        y = drawAtsHeader(canvas, "CAREER HISTORY", marginX, y, contentWidth, accent)
+                        for (exp in cv.experiences) {
+                            if (y >= PAGE_HEIGHT - 50f) break
+
+                            paint.color = Color.parseColor("#0F172A")
+                            paint.textSize = 11f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(exp.jobTitle, marginX, y, paint)
+
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#64748B")
+                                textSize = 9.5f
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(exp.dates, marginX + contentWidth, y, datePaint)
+                            y += 14f
+
+                            paint.color = accent
+                            paint.textSize = 10f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(exp.company, marginX, y, paint)
+                            y += 12f
+
+                            if (exp.achievements.isNotBlank()) {
+                                y = drawBulletOrParagraph(canvas, exp.achievements, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                            }
+                            y += 10f
+                        }
+                        y += 6f
+                    }
+                }
+                CVSectionType.EDUCATION -> {
+                    if (cv.educations.isNotEmpty()) {
+                        y = drawAtsHeader(canvas, "EDUCATION & QUALIFICATIONS", marginX, y, contentWidth, accent)
+                        for (edu in cv.educations) {
+                            if (y >= PAGE_HEIGHT - 50f) break
+
+                            paint.color = Color.parseColor("#0F172A")
+                            paint.textSize = 11f
+                            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                            canvas.drawText(edu.degree, marginX, y, paint)
+
+                            val datePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = Color.parseColor("#64748B")
+                                textSize = 9.5f
+                                textAlign = Paint.Align.RIGHT
+                            }
+                            canvas.drawText(edu.dates, marginX + contentWidth, y, datePaint)
+                            y += 13f
+
+                            paint.color = Color.parseColor("#475569")
+                            paint.textSize = 9.5f
+                            canvas.drawText(edu.school, marginX, y, paint)
+                            y += 14f
+                        }
+                        y += 6f
+                    }
+                }
+                CVSectionType.SKILLS -> {
+                    if (cv.skills.isNotBlank()) {
+                        y = drawAtsHeader(canvas, "CORE COMPETENCIES", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.skills, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                        y += 14f
+                    }
+                }
+                CVSectionType.CUSTOM_PROJECTS -> {
+                    if (cv.projects.isNotBlank()) {
+                        y = drawAtsHeader(canvas, "NOTABLE PROJECTS", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.projects, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                        y += 14f
+                    }
+                }
+                CVSectionType.LANGUAGES -> {
+                    if (cv.languages.isNotBlank()) {
+                        y = drawAtsHeader(canvas, "LANGUAGES", marginX, y, contentWidth, accent)
+                        y = drawBulletOrParagraph(canvas, cv.languages, marginX, y, contentWidth, 9.5f, Color.parseColor("#334155"), 14f)
+                        y += 14f
+                    }
+                }
+            }
+        }
     }
 
     fun sharePdf(context: Context, pdfFile: File) {

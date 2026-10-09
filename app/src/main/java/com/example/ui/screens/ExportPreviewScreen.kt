@@ -1,8 +1,11 @@
 package com.example.ui.screens
 
 import android.graphics.Bitmap
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -53,6 +56,22 @@ fun ExportPreviewScreen(
     var selectedFormat by remember { mutableStateOf("PDF") } // "PDF" or "Print"
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isGeneratingPdf by remember { mutableStateOf(false) }
+
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                val pdfFile = PdfGenerator.generatePdf(context, activeCv)
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    pdfFile.inputStream().use { input -> input.copyTo(out) }
+                }
+                Toast.makeText(context, "Saved to your device storage!", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "Save error: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     BackHandler {
         viewModel.navigateTo(ScreenType.EDITOR)
@@ -314,45 +333,66 @@ fun ExportPreviewScreen(
                             }
                         }
 
-                        // Save / Export Action Button
-                        Button(
-                            onClick = {
-                                isGeneratingPdf = true
-                                try {
-                                    val pdfFile = PdfGenerator.generatePdf(context, activeCv)
-                                    if (selectedFormat == "Print") {
-                                        PdfGenerator.printPdf(context, pdfFile)
-                                    } else {
-                                        PdfGenerator.sharePdf(context, pdfFile)
-                                        Toast.makeText(context, "PDF generated successfully: ${pdfFile.name}", Toast.LENGTH_LONG).show()
+                        // Save / Export Action Buttons Row
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = {
+                                    isGeneratingPdf = true
+                                    try {
+                                        val pdfFile = PdfGenerator.generatePdf(context, activeCv)
+                                        if (selectedFormat == "Print") {
+                                            PdfGenerator.printPdf(context, pdfFile)
+                                        } else {
+                                            PdfGenerator.sharePdf(context, pdfFile)
+                                            Toast.makeText(context, "PDF generated successfully: ${pdfFile.name}", Toast.LENGTH_LONG).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Export error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    } finally {
+                                        isGeneratingPdf = false
                                     }
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Export error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                } finally {
-                                    isGeneratingPdf = false
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .testTag("save_as_pdf_action_button"),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = ForestGreen,
-                                contentColor = PureWhite
-                            )
-                        ) {
-                            Icon(
-                                imageVector = if (selectedFormat == "Print") Icons.Default.Print else Icons.Default.FileDownload,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (selectedFormat == "Print") "Print Document" else "Save as PDF",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("save_as_pdf_action_button"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ForestGreen,
+                                    contentColor = PureWhite
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = if (selectedFormat == "Print") Icons.Default.Print else Icons.Default.Share,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = if (selectedFormat == "Print") "Print Document" else "Share / Open PDF",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    val safeFileName = "${activeCv.title.ifBlank { "My_CV" }.replace("\\s+".toRegex(), "_")}.pdf"
+                                    createDocumentLauncher.launch(safeFileName)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("save_to_downloads_btn"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = ForestGreen
+                                )
+                            ) {
+                                Icon(Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Save PDF to Phone Storage", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
 
                         Text(

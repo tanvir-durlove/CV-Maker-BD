@@ -1,6 +1,7 @@
 package com.example.viewmodel
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.model.CVModel
@@ -25,6 +26,8 @@ enum class ScreenType {
 }
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val prefs = application.getSharedPreferences("cv_maker_prefs", Context.MODE_PRIVATE)
 
     // Available Templates exactly as in Figma design
     val availableTemplates = listOf(
@@ -63,6 +66,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             tier = TemplateTier.REWARDED,
             category = "Modern",
             defaultAccent = "#1B6B56"
+        ),
+        TemplateInfo(
+            id = "apex",
+            name = "Apex",
+            subtitle = "Tech & Engineering",
+            description = "Bold header bar with technical skills highlight.",
+            tier = TemplateTier.REWARDED,
+            category = "Modern",
+            defaultAccent = "#4F46E5"
+        ),
+        TemplateInfo(
+            id = "summit",
+            name = "Summit",
+            subtitle = "Executive Minimalist",
+            description = "Sleek typography for leadership and senior roles.",
+            tier = TemplateTier.REWARDED,
+            category = "ATS-friendly",
+            defaultAccent = "#0F766E"
         )
     )
 
@@ -81,9 +102,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _editorStep = MutableStateFlow(0)
     val editorStep: StateFlow<Int> = _editorStep.asStateFlow()
 
-    // User settings
-    private val _userName = MutableStateFlow("Td")
+    // User settings (loads stored name or empty on first install)
+    private val _userName = MutableStateFlow(prefs.getString("user_name", "") ?: "")
     val userName: StateFlow<String> = _userName.asStateFlow()
+
+    // Name capture dialog state (shown on first launch after splash if name is not set)
+    private val _isNameCaptureDialogShowing = MutableStateFlow(false)
+    val isNameCaptureDialogShowing: StateFlow<Boolean> = _isNameCaptureDialogShowing.asStateFlow()
 
     private val _updateReminders = MutableStateFlow(true)
     val updateReminders: StateFlow<Boolean> = _updateReminders.asStateFlow()
@@ -92,24 +117,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _unlockedTemplates = MutableStateFlow(setOf("aura"))
     val unlockedTemplates: StateFlow<Set<String>> = _unlockedTemplates.asStateFlow()
 
-    // List of user CVs
-    private val _savedCvs = MutableStateFlow<List<CVModel>>(
-        listOf(
-            CVModel(
-                id = "demo_cv_1",
-                title = "My Modern CV",
-                templateId = "aura",
-                accentColorHex = "#134E3F",
-                lastEdited = "Oct 7, 2026 · Stored on device"
-            )
-        )
-    )
+    // List of user CVs (empty by default on clean installation)
+    private val _savedCvs = MutableStateFlow<List<CVModel>>(emptyList())
     val savedCvs: StateFlow<List<CVModel>> = _savedCvs.asStateFlow()
 
     // Current CV being created or edited
-    private val _activeCv = MutableStateFlow(
-        _savedCvs.value.firstOrNull() ?: CVModel()
-    )
+    private val _activeCv = MutableStateFlow(CVModel())
     val activeCv: StateFlow<CVModel> = _activeCv.asStateFlow()
 
     // Test Ad unit state
@@ -127,18 +140,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setUserName(name: String) {
-        _userName.value = name
+        val cleanName = name.trim()
+        _userName.value = cleanName
+        prefs.edit().putString("user_name", cleanName).apply()
+        // If demo CV has default name or empty, sync with active user name
+        val current = _activeCv.value
+        if (current.fullName.isBlank() || current.fullName == "User" || current.fullName == "Alex Morgan") {
+            _activeCv.value = current.copy(fullName = cleanName)
+        }
+    }
+
+    fun submitFirstName(name: String) {
+        setUserName(name)
+        _isNameCaptureDialogShowing.value = false
     }
 
     fun setUpdateReminders(enabled: Boolean) {
         _updateReminders.value = enabled
+        prefs.edit().putBoolean("update_reminders", enabled).apply()
     }
 
     fun resetAllData() {
-        _userName.value = "User"
+        _userName.value = ""
+        prefs.edit().clear().apply()
         _unlockedTemplates.value = setOf("aura")
         _savedCvs.value = emptyList()
-        _activeCv.value = CVModel(fullName = "User")
+        _activeCv.value = CVModel(fullName = "")
         _currentScreen.value = ScreenType.HOME
     }
 
@@ -160,6 +187,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _activeCv.value = cv
         _editorStep.value = 0
         _currentScreen.value = ScreenType.EDITOR
+    }
+
+    fun renameCv(cvId: String, newTitle: String) {
+        val trimmedTitle = newTitle.trim().ifBlank { "My CV" }
+        _savedCvs.value = _savedCvs.value.map {
+            if (it.id == cvId) it.copy(title = trimmedTitle, lastEdited = "Renamed · Stored on device") else it
+        }
+        if (_activeCv.value.id == cvId) {
+            _activeCv.value = _activeCv.value.copy(title = trimmedTitle)
+        }
     }
 
     fun duplicateCv(cv: CVModel) {
@@ -326,5 +363,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissInterstitialAd() {
         _isInterstitialAdShowing.value = false
+        // If user hasn't provided a name on first install, show Name Capture dialog
+        if (_userName.value.isBlank()) {
+            _isNameCaptureDialogShowing.value = true
+        }
     }
 }
